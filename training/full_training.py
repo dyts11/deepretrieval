@@ -115,9 +115,6 @@ def load_model_and_tokenizer():
 def setup_reward_model():
     """Setup reward model for training."""
     print("🎯 Setting up reward model...")
-    # For Colab users: Set your PubMed API key once:
-    # import os
-    # os.environ['PUBMED_API_KEY'] = 220ff7a280e75c017195dca8fe8ac6ae2409
     
     reward_model = create_reward_model(top_k=100, reward_scale=1.0)
     
