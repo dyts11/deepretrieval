@@ -57,6 +57,14 @@ def setup_ppo_config(device: str) -> PPOConfig:
 def load_model_and_tokenizer():
     """Load policy (with value head), reference model, and tokenizer."""
     print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
+    # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
+    hf_logging.set_verbosity_error()
+    warnings.filterwarnings(
+        "ignore",
+        message="Caching is incompatible with gradient checkpointing",
+        category=UserWarning,
+        module="transformers",
+    )
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Use float32 for numerical stability across TRL versions and to avoid NaNs on T4
@@ -107,7 +115,16 @@ def load_model_and_tokenizer():
 def setup_reward_model():
     """Setup reward model for training."""
     print("🎯 Setting up reward model...")
-    reward_model = create_reward_model(top_k=100, reward_scale=1.0)   
+    # For Colab users: Set your PubMed API key once:
+    # import os
+    # os.environ['PUBMED_API_KEY'] = 220ff7a280e75c017195dca8fe8ac6ae2409
+    
+    reward_model = create_reward_model(top_k=100, reward_scale=1.0)
+    
+    # Quick smoke test
+    test_query = "stem cell therapy pulmonary arterial hypertension"
+    test_relevant_pmids = ["22776744", "25271670", "3493740"]
+    _ = reward_model.compute_reward(test_query, test_relevant_pmids)
     print("✅ Reward model ready")
     return reward_model
 
@@ -235,16 +252,15 @@ def extract_boolean_query(output: str, prompt: str | None = None) -> str:
 
     return candidate
 
-def build_chat_query(raw_query: str, tokenizer) -> str:
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant that generates PubMed Boolean queries from PICO information."},
-        {"role": "user", "content": raw_query},
-    ]
-    return tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True  # ensures model expects assistant reply
-    )
+
+def tokenize_prompts(tokenizer, prompts: List[str], device: torch.device):
+    return tokenizer(
+        prompts,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512,
+        padding=True,
+    ).to(device)
 
 
 def run_full_training() -> bool:
@@ -307,94 +323,37 @@ def run_full_training() -> bool:
             batch_indices = random.sample(indices, batch_size)
             batch_prompts = [dataset[i]["query"] for i in batch_indices]
             batch_relevant = [dataset[i]["relevant_doc_ids"] for i in batch_indices]
-            # Build query tensors with proper chat template for Qwen2-Instruct
-
-            #query_tensors = [
-            #    tokenizer(build_chat_query(q, tokenizer), return_tensors="pt", truncation=True, max_length=2024).input_ids.squeeze(0).to(device)
-            #    for q in batch_prompts
-            #]
-            enc = tokenizer([build_chat_query(q, tokenizer) for q in batch_prompts],
-                return_tensors="pt", padding=True, truncation=True, max_length=1024).to(device)
-
-            query_tensors = [enc.input_ids[i] for i in range(enc.input_ids.size(0))]
-            prompt_text = build_chat_query(batch_prompts[0], tokenizer)
-            print("PROMPT RAW STRING:\n", repr(prompt_text))
-            ids = tokenizer(prompt_text).input_ids
-            print("DECODED BACK:\n", tokenizer.decode(ids))
-            
+                    
+            # Build query tensors as list for TRL API
+            query_tensors = [
+                tokenizer(p, return_tensors="pt", truncation=True, max_length=512).input_ids.squeeze(0).to(device_obj)
+                for p in batch_prompts
+            ]
+                    
             ppo_trainer.model.eval()
-            ppo_trainer.model.gradient_checkpointing_disable()
-            ppo_trainer.ref_model.gradient_checkpointing_disable()
-            orig_cache_policy = ppo_trainer.model.config.use_cache
-            orig_cache_ref    = ppo_trainer.ref_model.config.use_cache
-            ppo_trainer.model.config.use_cache = True
-            ppo_trainer.ref_model.config.use_cache = True
             # Use TRL's generate helper to ensure consistent masks/logprobs for KL
             with torch.no_grad():
-                responses_full = ppo_trainer.generate(
+                response_tensors = ppo_trainer.generate(
                     query_tensors,
-                    #enc.input_ids,
-                    #attention_mask=enc.attention_mask,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
                     top_p=top_p,
                     do_sample=True,
-                    min_new_tokens=1,
                     pad_token_id=tokenizer.pad_token_id,
-                    eos_token_id=tokenizer.eos_token_id,  
-                    use_cache=True,
+                    eos_token_id=tokenizer.eos_token_id,
                 )
-
-            
-            # compute prompt lengths
-            prompt_lens = enc.attention_mask.sum(dim=1).tolist()
-#
-            # slice continuations
-            cont_tensors = []
-            decoded_responses = [] 
-            for seq, plen, prompt in zip(responses_full, prompt_lens, batch_prompts):
-                cont = seq[plen:]
-                if cont.numel() == 0:
-                    cont = torch.tensor([tokenizer.eos_token_id], device=seq.device)
-                cont_tensors.append(cont)
-                raw = tokenizer.decode(cont, skip_special_tokens=True)
-                decoded_responses.append(raw)
-
-            response_tensors = cont_tensors
-            for i, (q_ids, r_ids) in enumerate(zip(query_tensors, response_tensors)):
-              print(f"=== sample {i} ===")
-              print("q_ids.shape:", q_ids.shape, "r_ids.shape:", r_ids.shape)
-              print("len q:", q_ids.shape[-1], "len r:", r_ids.shape[-1])
-              # decode the first N tokens of r_ids and the full r_ids
-              print("q_decode (raw):", tokenizer.decode(q_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False))
-              print("r_prefix_decode (first len(q) tokens of r):",
-                    tokenizer.decode(r_ids[: q_ids.shape[-1] ], skip_special_tokens=False, clean_up_tokenization_spaces=False))
-              print("r_full_decode (full r_ids):", tokenizer.decode(r_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False))
-              print("== q_ids ==\n", q_ids[:50].tolist())
-              print("== r_ids ==\n", r_ids[:50].tolist())
-              print("prefix-equals?", torch.equal(q_ids, r_ids[: q_ids.shape[-1] ]).item())
-              print()
-            
-            # Restore original settings after generation
-            ppo_trainer.model.config.use_cache = orig_cache_policy
-            ppo_trainer.ref_model.config.use_cache = orig_cache_ref
-            ppo_trainer.model.train()
-            ppo_trainer.model.gradient_checkpointing_enable()
-            ppo_trainer.ref_model.gradient_checkpointing_enable()
-                    
                     
             # Slice continuations and decode relative to prompts
-            #cont_tensors = []
-            #decoded_responses = []
-            #for q_ids, r_ids, prompt in zip(query_tensors, response_tensors, batch_prompts):
-            #    input_len = q_ids.shape[-1]
-            #    cont = r_ids[input_len:]
-            #    cont_tensors.append(cont)
-            #    raw = tokenizer.decode(cont, skip_special_tokens=True)
-            #    decoded_responses.append(extract_boolean_query(raw, prompt=prompt))
-#
-            ## Replace response_tensors with continuations for PPO step
-            #response_tensors = cont_tensors
+            cont_tensors = []
+            decoded_responses = []
+            for q_ids, r_ids, prompt in zip(query_tensors, response_tensors, batch_prompts):
+                input_len = q_ids.shape[-1]
+                cont = r_ids[input_len:]
+                cont_tensors.append(cont)
+                raw = tokenizer.decode(cont, skip_special_tokens=True)
+                decoded_responses.append(extract_boolean_query(raw, prompt=prompt))
+
+            response_tensors = cont_tensors
 
             # Filter invalid/empty continuations and off-format outputs prior to PPO
             #def is_valid_text(s: str) -> bool:
