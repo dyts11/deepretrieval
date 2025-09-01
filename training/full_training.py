@@ -382,7 +382,6 @@ def run_full_training() -> bool:
             ppo_trainer.model.gradient_checkpointing_enable()
             ppo_trainer.ref_model.gradient_checkpointing_enable()
                     
-
             # Slice continuations and decode relative to prompts
             #cont_tensors = []
             #decoded_responses = []
