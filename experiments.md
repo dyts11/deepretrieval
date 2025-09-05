@@ -1,25 +1,25 @@
 ### Experiment setup
 #### ppo config:
-learning_rate: 1e-5              How fast the model learns
-batch_size: 16,                  Number of samples per update
-mini_batch_size: 4               Subset size for gradient updates
-ppo_epochs: 1                    How many times to reuse each batch
-gradient_accumulation_steps: 1   Steps before applying gradients
-cliprange: 0.2                   Policy update clipping threshold
-cliprange_value: 0.2             Value function update clipping
-vf_coef: 0.1                     Weight of value loss in total loss
-target_kl: 0.1                   KL divergence stopping criterion
-seed: 42                         Reproducibility
-log_with: "wandb"                Logging backend
-adap_kl_ctrl: True               Adaptive KL penalty
-init_kl_coef: 1                  Initial KL penalty coefficient
+- learning_rate: 1e-5             -- How fast the model learns
+- batch_size: 16,                 -- Number of samples per update
+- mini_batch_size: 4              -- Subset size for gradient updates
+- ppo_epochs: 1                   -- How many times to reuse each batch
+- gradient_accumulation_steps: 1  -- Steps before applying gradients
+- cliprange: 0.2                  -- Policy update clipping threshold
+- cliprange_value: 0.2            -- Value function update clipping
+- vf_coef: 0.1                    -- Weight of value loss in total loss
+- target_kl: 0.1                  -- KL divergence stopping criterion
+- seed: 42                        -- Reproducibility
+- log_with: "wandb"               -- Logging backend
+- adap_kl_ctrl: True              -- Adaptive KL penalty
+- init_kl_coef: 1                 -- Initial KL penalty coefficient
 
 #### generation parameters
-num_updates = 600
-batch_size = 16
-max_new_tokens = 32  
-temperature = 0.7
-top_p = 0.9
+- num_updates = 600
+- batch_size = 16
+- max_new_tokens = 32  
+- temperature = 0.7
+- top_p = 0.9
 
 #### reward
 length of generated query, the shorter the respond, the higher the reward
