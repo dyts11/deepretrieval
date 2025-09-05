@@ -14,19 +14,15 @@ def load_pubmed_data(data_path: str) -> List[Dict[str, Any]]:
 
 def format_pico_for_llm(pico_dict: Dict[str, str]) -> str:
     """Convert PICO dict to LLM input format using few-shot Boolean query prompt"""
-    user_prompt = f'''Create a PubMed Boolean search query:
-
-EXAMPLE (format only - do not use this content):
-Boolean query: ("diabetes" AND "insulin therapy" AND "blood glucose control")
+    user_prompt = f'''Create a PubMed Boolean search query based on the following context:
 
 Patient: {pico_dict.get('P', '')}
 Intervention: {pico_dict.get('I', '')}
 Comparison: {pico_dict.get('C', '')}
 Outcome: {pico_dict.get('O', '')}
 
-IMPORTANT: Output ONLY the Boolean query in the format shown above. Do NOT include any explanations, notes, or extra text. Your response must be a single line containing only the Boolean query.
-
 Boolean query:'''
+
     return user_prompt
 
 

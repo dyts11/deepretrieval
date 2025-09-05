@@ -93,27 +93,28 @@ class RetrievalRewardModel(nn.Module):
 
             # 2) If full-query gets zero docs, try safer fallback using 2+ clause combinations
             #    We prefer OR-combinations of two clauses; if none reach a small threshold, fall back to best single clause.
-            if len(retrieved_pmids) == 0:
-                import re as _re
-                first_line = query.splitlines()[0].strip()
-                parts = [_p.strip() for _p in _re.split(r"\bAND\b|\bOR\b", first_line, flags=_re.IGNORECASE) if _p.strip()]
-                best_pmids = []
-                # try all 2-clause OR combinations first
-                for i in range(len(parts)):
-                    for j in range(i + 1, len(parts)):
-                        comb_query = f"{parts[i]} OR {parts[j]}"
-                        pmids_comb = self.pubmed_api.search_with_keywords(comb_query, topk=self.top_k)
-                        if len(pmids_comb) > len(best_pmids):
-                            best_pmids = pmids_comb
-                retrieved_pmids = best_pmids
-                # if still weak, try single parts and keep the best
-                if len(retrieved_pmids)== 0:
-                    for part in parts:
-                        pmids_part = self.pubmed_api.search_with_keywords(part, topk=self.top_k)
-                        if len(pmids_part) > len(best_pmids):
-                            best_pmids = pmids_part
-                    if best_pmids:
-                        retrieved_pmids = best_pmids
+            #if len(retrieved_pmids) == 0:
+            #    import re as _re
+            #    first_line = query.splitlines()[0].strip()
+            #    parts = [_p.strip() for _p in _re.split(r"\bAND\b|\bOR\b", first_line, flags=_re.IGNORECASE) if _p.strip()]
+            #    best_pmids = []
+            #    # try all 2-clause OR combinations first
+            #    for i in range(len(parts)):
+            #        for j in range(i + 1, len(parts)):
+            #            comb_query = f"{parts[i]} OR {parts[j]}"
+            #            pmids_comb = self.pubmed_api.search_with_keywords(comb_query, topk=self.top_k)
+            #            if len(pmids_comb) > len(best_pmids):
+            #                best_pmids = pmids_comb
+            #    retrieved_pmids = best_pmids
+            #    # if still weak, try single parts and keep the best
+            #    if len(retrieved_pmids)== 0:
+            #        for part in parts:
+            #            pmids_part = self.pubmed_api.search_with_keywords(part, topk=self.top_k)
+            #            if len(pmids_part) > len(best_pmids):
+            #                best_pmids = pmids_part
+            #        if best_pmids:
+            #            retrieved_pmids = best_pmids
+            
             relevant_set = set(relevant_pmids)
             topk_list = retrieved_pmids[: self.top_k]
             retrieved_set = set(topk_list)
@@ -129,18 +130,21 @@ class RetrievalRewardModel(nn.Module):
                 'ndcg': ndcg,
                 'mrr': mrr,
             }
-            reward = sum(self.weights[k] * comp[k] for k in comp.keys())
+            #reward = sum(self.weights[k] * comp[k] for k in comp.keys())
 
             # 3) Retrieval density shaping: encourage queries that return a healthy number of docs
             density_target = max(10, self.top_k)  # aim for at least top_k hits
             density = min(1.0, len(retrieved_pmids) / float(density_target))
             #reward += 0.2 * density
 
-            reward = max(self.min_reward, min(self.max_reward, reward * self.reward_scale))
-
-            self._update_stats(reward, query, retrieved_pmids, relevant_pmids)
+            #reward = max(self.min_reward, min(self.max_reward, reward * self.reward_scale))
+            q = query.split()
+            length = len(q)
+            reward = 2 - length/16
+            #self._update_stats(reward, query, retrieved_pmids, relevant_pmids)
             return reward
-        except Exception:
+        except Exception as e:
+            print(e)
             # On error, return minimum reward (no format fallback)
             return self.min_reward
 
@@ -178,12 +182,12 @@ class RetrievalRewardModel(nn.Module):
     #    self.total_reward = 0.0
     #    self.reward_history = []
 
-    #def compute_reward(
-    #    self,
-    #    query: str,
-    #    relevant_pmids: List[str]
-    #) -> float:
-    #    return self._compute_single_reward(query, relevant_pmids)
+    def compute_reward(
+        self,
+        query: str,
+        relevant_pmids: List[str]
+    ) -> float:
+        return self._compute_single_reward(query, relevant_pmids)
 
     def compute_rewards_batch(
         self,

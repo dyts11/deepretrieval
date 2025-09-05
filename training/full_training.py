@@ -37,7 +37,7 @@ def setup_ppo_config(device: str) -> PPOConfig:
         "learning_rate": 1e-5,
         "batch_size": 16,
         "mini_batch_size": 4,
-        "ppo_epochs": 2,
+        "ppo_epochs": 1,
         "gradient_accumulation_steps": 1,
         "cliprange": 0.2,
         "cliprange_value": 0.2,
@@ -46,7 +46,7 @@ def setup_ppo_config(device: str) -> PPOConfig:
         "seed": 42,
         "log_with": "wandb",
         "adap_kl_ctrl": True,
-        "init_kl_coef": 0.2,
+        "init_kl_coef": 1,
     }
     # Filter by constructor signature to avoid unexpected-arg errors
     allowed = set(inspect.signature(PPOConfig.__init__).parameters.keys())
@@ -146,108 +146,109 @@ def extract_boolean_query(output: str, prompt: str | None = None) -> str:
       4) Fallback to the last line that contains AND/OR/NOT
     Then sanitize: strip SQL tails, normalize operators, collapse whitespace, cap length.
     """
-    if not output:
-        return ""
-    text = output.strip()
-
-    # 0) Strip prompt prefix if available
-    if prompt:
-        p = prompt.strip()
-        if text.startswith(p):
-            text = text[len(p):].lstrip()
-        else:
-            pos = text.find(p)
-            if pos != -1:
-                text = text[pos + len(p):].lstrip()
-
-    # Helper to decide if candidate is valid
-    def is_weak(s: str) -> bool:
-        s_clean = s.strip().strip('()')
-        if not s_clean:
-            return True
-        u = s_clean.upper()
-        if u in {"AND", "OR", "NOT"}:
-            return True
-        return False
-
-    # 1) Tag-based extraction
-    candidate = None
-    #m = re.search(r"<query>(.*?)</query>", text, flags=re.IGNORECASE | re.DOTALL)
-    #tail_after_tag = None
-    #if m:
-    #    candidate = m.group(1).strip()
-    #    tail_after_tag = text[m.end():].strip()
-    #    if is_weak(candidate) and tail_after_tag:
-    #        # look in the tail for a stronger boolean line
-    #        for line in tail_after_tag.splitlines():
-    #            line = line.strip()
-    #            U = f" {line.upper()} "
-    #            if (" AND " in U) or (" OR " in U) or (" NOT " in U):
-    #                candidate = line
-    #                break
-    #if candidate is None:
-    #    # 2) Last "Boolean query:" occurrence
-    #    idx = text.lower().rfind("boolean query:")
-    #    if idx != -1:
-    #        after = text[idx + len("boolean query:") :].strip()
-    #        for line in after.splitlines():
-    #            line = line.strip()
-    #            if not line:
-    #                continue
-    #            candidate = line
-    #            break
-    ## 3) If still none, take the last line with AND/OR/NOT
+    return output
+    #if not output:
+    #    return ""
+    #text = output.strip()
+#
+    ## 0) Strip prompt prefix if available
+    #if prompt:
+    #    p = prompt.strip()
+    #    if text.startswith(p):
+    #        text = text[len(p):].lstrip()
+    #    else:
+    #        pos = text.find(p)
+    #        if pos != -1:
+    #            text = text[pos + len(p):].lstrip()
+#
+    ## Helper to decide if candidate is valid
+    #def is_weak(s: str) -> bool:
+    #    s_clean = s.strip().strip('()')
+    #    if not s_clean:
+    #        return True
+    #    u = s_clean.upper()
+    #    if u in {"AND", "OR", "NOT"}:
+    #        return True
+    #    return False
+#
+    ## 1) Tag-based extraction
+    #candidate = None
+    ##m = re.search(r"<query>(.*?)</query>", text, flags=re.IGNORECASE | re.DOTALL)
+    ##tail_after_tag = None
+    ##if m:
+    ##    candidate = m.group(1).strip()
+    ##    tail_after_tag = text[m.end():].strip()
+    ##    if is_weak(candidate) and tail_after_tag:
+    ##        # look in the tail for a stronger boolean line
+    ##        for line in tail_after_tag.splitlines():
+    ##            line = line.strip()
+    ##            U = f" {line.upper()} "
+    ##            if (" AND " in U) or (" OR " in U) or (" NOT " in U):
+    ##                candidate = line
+    ##                break
+    ##if candidate is None:
+    ##    # 2) Last "Boolean query:" occurrence
+    ##    idx = text.lower().rfind("boolean query:")
+    ##    if idx != -1:
+    ##        after = text[idx + len("boolean query:") :].strip()
+    ##        for line in after.splitlines():
+    ##            line = line.strip()
+    ##            if not line:
+    ##                continue
+    ##            candidate = line
+    ##            break
+    ### 3) If still none, take the last line with AND/OR/NOT
+    ##if not candidate:
+    ##    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    ##    for line in reversed(lines):
+    ##        U = f" {line.upper()} "
+    ##        if (" AND " in U) or (" OR " in U) or (" NOT " in U):
+    ##            candidate = line
+    ##            break
+    ## 4) Final fallback: last non-empty line
     #if not candidate:
-    #    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    #    for line in reversed(lines):
-    #        U = f" {line.upper()} "
-    #        if (" AND " in U) or (" OR " in U) or (" NOT " in U):
-    #            candidate = line
-    #            break
-    # 4) Final fallback: last non-empty line
-    if not candidate:
-        candidate = text.splitlines()[-1].strip()
-        #lines_non_empty = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        #chosen = None
-        #for ln in reversed(lines_non_empty):
-        #    U = f" {ln.upper()} "
-        #    if (" AND " in U) or (" OR " in U) or (" NOT " in U):
-        #        chosen = ln
-        #        break
-        #if chosen is None:
-        #    chosen = lines_non_empty[-1] if lines_non_empty else ""
-        #candidate = chosen
-
-    # Remove trailing SQL or text after ';'
-    if ';' in candidate:
-        candidate = candidate.split(';', 1)[0].strip()
-    # Remove obvious SQL keyword fragments
-    for token in ["SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "INSERT", "UPDATE", "DELETE"]:
-        idx = candidate.upper().find(token)
-        if idx != -1:
-            candidate = candidate[:idx].strip()
-            break
-
-    # Normalize boolean operators (case-insensitive)
-    def norm_ops(s: str) -> str:
-        s = re.sub(r"\bAND\b", "AND", s, flags=re.IGNORECASE)
-        s = re.sub(r"\bOR\b", "OR", s, flags=re.IGNORECASE)
-        s = re.sub(r"\bNOT\b", "NOT", s, flags=re.IGNORECASE)
-        return s
-
-    candidate = norm_ops(candidate)
-
-    # Collapse whitespace and quotes balance quick fix
-    candidate = " ".join(candidate.split())
-    if candidate.count('"') % 2 == 1:
-        candidate = candidate.rstrip('"')
-    
-    # Cap to 40 tokens to keep queries concise
-    tokens = candidate.split()
-    if len(tokens) > 40:
-        candidate = " ".join(tokens[:40])
-
-    return candidate
+    #    candidate = text.splitlines()[0].strip()
+    #    #lines_non_empty = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    #    #chosen = None
+    #    #for ln in reversed(lines_non_empty):
+    #    #    U = f" {ln.upper()} "
+    #    #    if (" AND " in U) or (" OR " in U) or (" NOT " in U):
+    #    #        chosen = ln
+    #    #        break
+    #    #if chosen is None:
+    #    #    chosen = lines_non_empty[-1] if lines_non_empty else ""
+    #    #candidate = chosen
+#
+    ## Remove trailing SQL or text after ';'
+    #if ';' in candidate:
+    #    candidate = candidate.split(';', 1)[0].strip()
+    ## Remove obvious SQL keyword fragments
+    #for token in ["SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "INSERT", "UPDATE", "DELETE"]:
+    #    idx = candidate.upper().find(token)
+    #    if idx != -1:
+    #        candidate = candidate[:idx].strip()
+    #        break
+#
+    ## Normalize boolean operators (case-insensitive)
+    #def norm_ops(s: str) -> str:
+    #    s = re.sub(r"\bAND\b", "AND", s, flags=re.IGNORECASE)
+    #    s = re.sub(r"\bOR\b", "OR", s, flags=re.IGNORECASE)
+    #    s = re.sub(r"\bNOT\b", "NOT", s, flags=re.IGNORECASE)
+    #    return s
+#
+    #candidate = norm_ops(candidate)
+#
+    ## Collapse whitespace and quotes balance quick fix
+    #candidate = " ".join(candidate.split())
+    #if candidate.count('"') % 2 == 1:
+    #    candidate = candidate.rstrip('"')
+    #
+    ## Cap to 40 tokens to keep queries concise
+    #tokens = candidate.split()
+    #if len(tokens) > 40:
+    #    candidate = " ".join(tokens[:40])
+#
+    #return candidate
 
 
 def tokenize_prompts(tokenizer, prompts: List[str], device: torch.device):
@@ -348,7 +349,7 @@ def run_full_training() -> bool:
                 cont = r_ids[input_len:]
                 cont_tensors.append(cont)
                 raw = tokenizer.decode(cont, skip_special_tokens=True)
-                decoded_responses.append(extract_boolean_query(raw, prompt=prompt))
+                decoded_responses.append(raw)
 
             response_tensors = cont_tensors
 
@@ -457,12 +458,12 @@ def run_full_training() -> bool:
                 torch.cuda.empty_cache()
 
         # Save final model and tokenizer
-        print("\n💾 Saving final model...")
-        save_dir = "models/phase5_final_recall"
-        os.makedirs(save_dir, exist_ok=True)
-        ppo_trainer.model.save_pretrained(save_dir)
-        tokenizer.save_pretrained(save_dir)
-        print(f"✅ Final model saved: {save_dir}")
+        #print("\n💾 Saving final model...")
+        #save_dir = "models/phase5_final_recall"
+        #os.makedirs(save_dir, exist_ok=True)
+        #ppo_trainer.model.save_pretrained(save_dir)
+        #tokenizer.save_pretrained(save_dir)
+        #print(f"✅ Final model saved: {save_dir}")
         
         wandb.finish()
         print("\n🎉 Phase 5 completed successfully!")
