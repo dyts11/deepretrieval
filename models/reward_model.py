@@ -140,7 +140,7 @@ class RetrievalRewardModel(nn.Module):
             #reward = max(self.min_reward, min(self.max_reward, reward * self.reward_scale))
             q = query.split()
             length = len(q)
-            reward = 2 - length/16
+            reward = (2 - length/16) * 0.1
             #self._update_stats(reward, query, retrieved_pmids, relevant_pmids)
             return reward
         except Exception as e:
