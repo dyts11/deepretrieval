@@ -34,7 +34,7 @@ def setup_ppo_config(device: str) -> PPOConfig:
     """Setup PPO configuration and auto-filter unsupported keys for TRL version compatibility."""
     # Even gentler updates to avoid ratio explosions and KL pathologies
     base_cfg = {
-        "learning_rate": 1e-5,
+        "learning_rate": 1e-6,
         "batch_size": 16,
         "mini_batch_size": 4,
         "ppo_epochs": 1,
@@ -46,7 +46,7 @@ def setup_ppo_config(device: str) -> PPOConfig:
         "seed": 42,
         "log_with": "wandb",
         "adap_kl_ctrl": True,
-        "init_kl_coef": 1,
+        "init_kl_coef": 0.5,
     }
     # Filter by constructor signature to avoid unexpected-arg errors
     allowed = set(inspect.signature(PPOConfig.__init__).parameters.keys())

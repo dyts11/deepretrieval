@@ -229,10 +229,86 @@ Experiment 3 provides crucial negative evidence: **reward magnitude does not aff
 
 **Training Status**: Confirms that learning rate optimization is the critical path forward - reward engineering is not the solution.
 
-### Experimental Insights Summary
+### experiment 4
+#### training description
+Testing interaction between learning rate and KL penalty. Based on experiment 2's stability but poor learning, reduced KL penalty to encourage more policy updates.
+- Learning rate: 1e-6 (same as experiment 2 - stable)
+- KL penalty: init_kl_coef reduced from 1.0 to 0.5
+- All other hyperparameters identical to experiment 2
 
-**Established Facts from Three Experiments:**
-1. **Learning Rate 1e-5**: Unstable but effective learning
-2. **Learning Rate 1e-6**: Stable but insufficient learning  
-3. **Reward Scaling**: No effect on stability whatsoever
-4. **Optimal Range**: Learning rate must be between 1e-6 and 1e-5
+Hypothesis: Lower KL penalty will allow more policy exploration while maintaining stability from low learning rate.
+
+#### training results
+![](graph/train_4_train.png)
+![](graph/train_4_policy.png)
+
+#### Detailed Analysis
+
+**Training Stability - MAINTAINED:**
+- **Value Loss**: Remains stable like experiment 2, no catastrophic spikes
+- **Policy Loss**: Similarly controlled, maintaining the stability benefits of lr=1e-6
+- **Total Loss**: Stable training dynamics preserved
+
+**Reward Learning - STILL MINIMAL:**
+- **Marginal improvement**: Less than 0.1 improvement, similar to experiment 2
+- **Insufficient learning**: KL penalty reduction did not meaningfully improve task learning
+- **Learning rate bottleneck**: 1e-6 appears to be the limiting factor, not KL penalty
+
+**KL Divergence - INCREASED NEGATIVE VALUES:**
+- **Expanded range**: KL now between 0 to -15 (vs 0 to -3 in experiment 2)
+- **More negative**: Lower KL penalty allows larger policy deviations
+- **Still problematic**: Negative KL values indicate persistent numerical issues
+
+**Entropy Behavior - UNEXPECTED INCREASE:**
+- **Higher entropy**: Increased to ~5 (vs stable 2-3 in experiment 2)
+- **More exploration**: Policy maintaining more randomness/exploration
+- **Positive sign**: Indicates policy is less deterministic
+
+#### Key Insights from KL and Entropy Changes
+
+**What the KL Change (0~-3 → 0~-15) Means:**
+1. **Policy Diverging More**: Lower KL penalty allows policy to deviate further from reference
+2. **Computational Issues Amplified**: More negative KL suggests numerical instability growing
+3. **Expected Behavior**: Reduced penalty should increase KL magnitude
+4. **Still Controlled**: Unlike experiment 1's extreme spikes, this is gradual increase
+
+**What the Entropy Increase (2-3 → 5) Means:**
+1. **More Exploration**: Policy maintaining higher randomness in outputs
+2. **Less Deterministic**: Model not collapsing to single response pattern
+3. **Positive Development**: Better exploration could lead to better solutions
+4. **KL Penalty Effect**: Lower penalty allows more diverse policy outputs
+
+#### Root Cause Analysis
+
+**KL Penalty Reduction Effects:**
+✅ **Successfully increased exploration** (higher entropy)  
+✅ **Maintained training stability** (no value loss spikes)  
+✅ **Allowed more policy deviation** (expanded KL range)  
+❌ **Did not improve learning** (reward still flat)  
+
+#### Critical Finding: KL Penalty vs Learning Rate Hierarchy
+
+**Key Insight**: Reducing KL penalty affects **exploration behavior** but not **learning speed**:
+
+🎯 **Learning Rate**: Controls magnitude of policy updates (how much change)  
+🎯 **KL Penalty**: Controls direction/freedom of policy updates (what kind of change)  
+🎯 **Hierarchy**: Learning rate dominates - without sufficient magnitude, direction doesn't matter  
+
+#### Interpretation of Results
+
+**Why Entropy Increased:**
+- **Exploration space expanded**: Lower KL penalty allows more diverse outputs
+- **Less premature convergence**: Policy not forced into narrow solutions
+- **Positive for future**: Higher entropy provides foundation for learning if gradients increase
+
+**Why KL Became More Negative:**
+- **Computational precision**: Larger policy deviations exacerbate numerical issues
+- **Expected direction**: Lower penalty should increase KL magnitude
+- **Still manageable**: Unlike experiment 1, this is gradual increase not explosive
+
+#### Conclusion:
+Experiment 4 confirms that **learning rate is the primary bottleneck**, not KL penalty. Reducing KL penalty successfully increased exploration (higher entropy) and policy freedom (larger KL range) while maintaining stability, but failed to improve learning because the learning rate (1e-6) remains too conservative.
+
+**Key Finding**: KL penalty and learning rate have **different roles** - learning rate controls learning speed, KL penalty controls exploration behavior.
+
+**Training Status**: Stable training maintained, exploration improved, but learning rate still needs optimization for meaningful task progress.
