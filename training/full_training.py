@@ -37,7 +37,7 @@ def setup_ppo_config(device: str) -> PPOConfig:
         "learning_rate": 1e-6,
         "batch_size": 16,
         "mini_batch_size": 4,
-        "ppo_epochs": 1,
+        "ppo_epochs": 2,
         "gradient_accumulation_steps": 1,
         "cliprange": 0.2,
         "cliprange_value": 0.2,

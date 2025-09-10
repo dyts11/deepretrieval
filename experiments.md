@@ -312,3 +312,105 @@ Experiment 4 confirms that **learning rate is the primary bottleneck**, not KL p
 **Key Finding**: KL penalty and learning rate have **different roles** - learning rate controls learning speed, KL penalty controls exploration behavior.
 
 **Training Status**: Stable training maintained, exploration improved, but learning rate still needs optimization for meaningful task progress.
+
+### experiment 5
+#### training description
+Testing whether increasing PPO epochs can improve learning speed while maintaining stability from experiment 4.
+- Learning rate: 1e-6 (stable from experiments 2 & 4)
+- KL penalty: init_kl_coef = 0.5
+- PPO epochs: increased from 1 to 2
+- All other hyperparameters identical to experiment 4
+
+Hypothesis: More PPO epochs will increase learning speed by doing more updates per batch, leading to faster reward improvement and controlled KL growth.
+
+#### training results
+![](graph/train_5_train.png)
+![](graph/train_5_policy.png)
+
+#### Detailed Analysis
+
+**Reward Learning - STILL MINIMAL:**
+- **No obvious improvement**: Reward learning remains flat, similar to experiments 2 & 4
+- **PPO epochs ineffective**: Doubling epochs did not overcome the learning rate bottleneck
+- **Fundamental limit**: 1e-6 learning rate still too conservative regardless of epoch count
+
+**KL Divergence - IMPROVED STABILITY:**
+- **Better controlled range**: KL stays between +1 to -3 (vs 0 to -15 in experiment 4)
+- **More stable than experiment 2**: Even better KL control than the baseline stable experiment
+- **Unexpected improvement**: PPO epochs helped stabilize KL behavior
+
+**Policy Loss - SYSTEMATIC SHIFT:**
+- **Negative bias**: Policy loss now consistently around -0.025 (vs ~0 in experiment 4)
+- **More consistent**: Less volatility compared to experiment 4
+- **Systematic pattern**: Indicates different optimization dynamics
+
+**Value Function - MAINTAINED STABILITY:**
+- **Prediction error stable**: Continues excellent stability from previous experiments
+- **Explained variance**: Steady improvement pattern maintained
+- **No degradation**: Additional epochs didn't destabilize value function
+
+**Entropy - FLATTENED BEHAVIOR:**
+- **Less dynamic**: Entropy becomes more flat around 3.0-3.5 range
+- **Reduced exploration variance**: Less fluctuation compared to experiment 4's ~5.0 levels
+- **Different exploration pattern**: More consistent but potentially less diverse
+
+**Policy Behavior - INCREASED ACTIVITY:**
+- **Higher clip fraction**: Increased clipping indicates more aggressive policy updates
+- **Higher approx_kl**: More approximate KL divergence, showing larger policy changes
+- **More update activity**: PPO epochs enabling more policy modification
+
+#### Critical Analysis: Why These Changes Occurred
+
+**KL Stabilization (1 to -3 vs 0 to -15):**
+1. **Multiple updates per batch**: 2 PPO epochs allow policy to "settle" within each batch
+2. **Better optimization**: Multiple passes help find more stable policy updates
+3. **Gradient averaging**: Multiple epochs smooth out erratic gradient directions
+4. **Unexpected benefit**: PPO epochs helped control, not just speed up learning
+
+**Policy Loss Shift (0 → -0.025):**
+1. **Optimization dynamics change**: Multiple epochs alter the loss landscape traversal
+2. **Different equilibrium**: Policy finding different stable point with more updates
+3. **Systematic bias**: Consistent negative values suggest underlying optimization pattern
+4. **Not necessarily problematic**: Stable negative loss can be normal in PPO
+
+**Entropy Flattening (variable ~5 → flat ~3.5):**
+1. **Reduced exploration variance**: More epochs leading to more consistent policy
+2. **Optimization settling**: Multiple passes reducing policy uncertainty
+3. **Trade-off**: Less exploration diversity but more stable behavior
+4. **Mixed result**: Stability gained but exploration potentially reduced
+
+**Increased Clip Fraction & Approx KL:**
+1. **More aggressive updates**: Multiple epochs enabling larger policy changes per batch
+2. **Learning rate amplification**: Even small lr becomes more effective with multiple epochs
+3. **Expected behavior**: More epochs should increase update magnitudes
+4. **Still controlled**: Unlike experiment 1, these increases are manageable
+
+#### PPO Epochs Effect Analysis
+
+**What PPO Epochs Actually Did:**
+✅ **Improved KL stability** (unexpected positive effect)  
+✅ **Maintained overall training stability** (no catastrophic failures)  
+✅ **Increased policy update activity** (higher clip fraction, approx KL)  
+✅ **Smoothed optimization dynamics** (more consistent losses)  
+❌ **Did not overcome learning rate bottleneck** (reward still flat)  
+🟡 **Reduced exploration variance** (flatter entropy - mixed result)  
+
+#### Key Insights
+
+**PPO Epochs as Stabilization Tool:**
+- **Unexpected finding**: PPO epochs improved stability more than learning speed
+- **Optimization smoothing**: Multiple passes help find better local optima
+- **KL control benefit**: Better than just reducing learning rate alone
+- **New hyperparameter role**: PPO epochs as stability enhancer, not just speed booster
+
+**Learning Rate Still Bottleneck:**
+- **Consistent pattern**: 5 experiments confirm learning rate is primary constraint
+- **Epochs insufficient**: Can't overcome fundamentally small gradient magnitudes
+- **Next step clear**: Must increase learning rate to see meaningful reward learning
+
+#### Conclusion:
+Experiment 5 reveals that **PPO epochs act as a stabilization tool** rather than just a learning accelerator. While reward learning remained minimal due to the learning rate bottleneck, the training became more stable with better KL control and smoother optimization dynamics.
+
+**Unexpected Discovery**: PPO epochs = 2 provides better stability than epochs = 1, making it a valuable hyperparameter for controlled training.
+
+**Training Status**: Most stable configuration yet achieved, but learning rate increase still necessary for meaningful task progress.
