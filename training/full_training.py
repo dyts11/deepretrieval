@@ -57,7 +57,8 @@ def setup_ppo_config(device: str) -> PPOConfig:
 def load_model_and_tokenizer():
     """Load policy (with value head), reference model, and tokenizer."""
     #print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
-    print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
+    #print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
+    model_name = "Qwen/Qwen2.5-3B-Instruct"
     # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
     hf_logging.set_verbosity_error()
     warnings.filterwarnings(
@@ -281,8 +282,10 @@ def run_full_training() -> bool:
 
     #wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
     #        "model": "Qwen/Qwen2-0.5B-Instruct",
-    wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
-            "model": "meta-llama/Llama-3.2-3B-Instruct",
+    #wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
+    #        "model": "meta-llama/Llama-3.2-3B-Instruct",
+    wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
+            "model": "Qwen/Qwen2.5-3B-Instruct",
         "dataset_samples": 600,
         "batch_size": 16,
         "updates": 1000,
