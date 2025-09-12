@@ -277,7 +277,7 @@ def run_full_training() -> bool:
             "model": "Qwen/Qwen2-0.5B-Instruct",
         "dataset_samples": 1000,
         "batch_size": 16,
-        "updates": 600,
+        "updates": 1000,
         "max_new_tokens": 32,
     })
     
@@ -302,7 +302,7 @@ def run_full_training() -> bool:
         print("✅ PPO trainer ready")
         
         # Training parameters
-        num_updates = 600
+        num_updates = 1000
         batch_size = 16
         max_new_tokens = 32  
         temperature = 0.7
