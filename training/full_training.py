@@ -56,7 +56,8 @@ def setup_ppo_config(device: str) -> PPOConfig:
 
 def load_model_and_tokenizer():
     """Load policy (with value head), reference model, and tokenizer."""
-    print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
+    #print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
+    print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
     # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
     hf_logging.set_verbosity_error()
     warnings.filterwarnings(
@@ -67,10 +68,11 @@ def load_model_and_tokenizer():
     )
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # Use float32 for numerical stability across TRL versions and to avoid NaNs on T4
-    dtype = torch.float32
+    # Use bfloat16 for larger models to save memory while maintaining stability
+    dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 
-    model_name = "Qwen/Qwen2-0.5B-Instruct"
+    #model_name = "Qwen/Qwen2-0.5B-Instruct"
+    model_name = "meta-llama/Llama-3.2-3B-Instruct"
 
     # Policy with value head
     policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
@@ -79,6 +81,8 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
+        # Additional memory optimizations for larger model
+        attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     )
 
     # Reference model for KL control (with value head wrapper)
@@ -88,6 +92,8 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
+        # Additional memory optimizations for larger model
+        attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -273,9 +279,11 @@ def run_full_training() -> bool:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(42)
 
-    wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
-            "model": "Qwen/Qwen2-0.5B-Instruct",
-        "dataset_samples": 1000,
+    #wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
+    #        "model": "Qwen/Qwen2-0.5B-Instruct",
+    wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
+            "model": "meta-llama/Llama-3.2-3B-Instruct",
+        "dataset_samples": 600,
         "batch_size": 16,
         "updates": 1000,
         "max_new_tokens": 32,
@@ -302,7 +310,7 @@ def run_full_training() -> bool:
         print("✅ PPO trainer ready")
         
         # Training parameters
-        num_updates = 1000
+        num_updates = 600
         batch_size = 16
         max_new_tokens = 32  
         temperature = 0.7
