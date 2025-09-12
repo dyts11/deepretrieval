@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from utils.pubmed_api import PubmedAPI, create_pubmed_retriever
 import asyncio
 import math
+import re
 
 
 def compute_ndcg_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
@@ -140,7 +141,23 @@ class RetrievalRewardModel(nn.Module):
             #reward = max(self.min_reward, min(self.max_reward, reward * self.reward_scale))
             q = query.split()
             length = len(q)
-            reward = (2 - length/16) * 0.1
+            #reward = (2 - length/16) * 0.1
+            # 4) Boolean query format reward
+            query = query.strip()
+            query_upper = query.upper()
+            has_and = ' AND ' in query_upper
+            has_or = ' OR ' in query_upper
+            has_boolean = has_and or has_or
+            # Look for pattern like (text) AND/OR (text)
+            phrase_pattern = r'\([^)]+\)\s+(AND|OR)\s+\([^)]+\)'
+            has_phrase_pattern = bool(re.search(phrase_pattern, query_upper))
+            reward = 0.0
+            if has_boolean:
+                reward += 0.3
+            if has_phrase_pattern:
+                reward += 0.5
+            if 5 < length < 30:
+                reward += 0.2
             #self._update_stats(reward, query, retrieved_pmids, relevant_pmids)
             return reward
         except Exception as e:
