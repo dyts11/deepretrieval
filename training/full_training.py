@@ -57,8 +57,8 @@ def setup_ppo_config(device: str) -> PPOConfig:
 def load_model_and_tokenizer():
     """Load policy (with value head), reference model, and tokenizer."""
     #print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
-    #print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
-    print("🤖 Loading Qwen/Qwen2.5-3B-Instruct policy and reference models...")
+    print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
+    #print("🤖 Loading Qwen/Qwen2.5-3B-Instruct policy and reference models...")
     # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
     hf_logging.set_verbosity_error()
     warnings.filterwarnings(
@@ -73,8 +73,8 @@ def load_model_and_tokenizer():
     dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 
     #model_name = "Qwen/Qwen2-0.5B-Instruct"
-    #model_name = "meta-llama/Llama-3.2-3B-Instruct"
-    model_name = "Qwen/Qwen2.5-3B-Instruct"
+    model_name = "meta-llama/Llama-3.2-3B-Instruct"
+    #model_name = "Qwen/Qwen2.5-3B-Instruct"
 
     # Policy with value head
     policy_model = AutoModelForCausalLMWithValueHead.from_pretrained(
@@ -83,8 +83,6 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
-        # Additional memory optimizations for larger model
-        attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     )
 
     # Reference model for KL control (with value head wrapper)
@@ -94,8 +92,6 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
-        # Additional memory optimizations for larger model
-        attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -283,13 +279,13 @@ def run_full_training() -> bool:
 
     #wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
     #        "model": "Qwen/Qwen2-0.5B-Instruct",
-    #wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
-    #        "model": "meta-llama/Llama-3.2-3B-Instruct",
-    wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+    wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
+            "model": "meta-llama/Llama-3.2-3B-Instruct",
+    #wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
+    #        "model": "Qwen/Qwen2.5-3B-Instruct",
         "dataset_samples": 600,
         "batch_size": 16,
-        "updates": 1000,
+        "updates": 600,
         "max_new_tokens": 32,
     })
     
