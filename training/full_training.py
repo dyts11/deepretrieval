@@ -83,6 +83,7 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
+        load_in_8bit=True,
     )
 
     # Reference model for KL control (with value head wrapper)
@@ -92,6 +93,7 @@ def load_model_and_tokenizer():
         device_map="auto" if device == "cuda" else {"": device},
         trust_remote_code=True,
         low_cpu_mem_usage=True,
+        load_in_8bit=True,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
