@@ -48,7 +48,7 @@ class RetrievalRewardModel(nn.Module):
         min_reward: float = 0.0,
         max_reward: float = 5.0,
         # weights (retrieval-only by default)
-        w_recall: float = 1,
+        w_recall: float = 0.8,
         w_precision: float = 0,
         w_ndcg: float = 0,
         w_mrr: float = 0,
@@ -131,7 +131,7 @@ class RetrievalRewardModel(nn.Module):
                 'ndcg': ndcg,
                 'mrr': mrr,
             }
-            #reward = sum(self.weights[k] * comp[k] for k in comp.keys())
+            reward = sum(self.weights[k] * comp[k] for k in comp.keys())
 
             # 3) Retrieval density shaping: encourage queries that return a healthy number of docs
             density_target = max(10, self.top_k)  # aim for at least top_k hits
@@ -151,13 +151,12 @@ class RetrievalRewardModel(nn.Module):
             # Look for pattern like (text) AND/OR (text)
             phrase_pattern = r'\([^)]+\)\s+(AND|OR)\s+\([^)]+\)'
             has_phrase_pattern = bool(re.search(phrase_pattern, query_upper))
-            reward = 0.0
             if has_boolean:
-                reward += 0.3
+                reward += 0.3 * 0.2
             if has_phrase_pattern:
-                reward += 0.5
+                reward += 0.5 * 0.2
             if 5 < length < 30:
-                reward += 0.2
+                reward += 0.2 * 0.2
             #self._update_stats(reward, query, retrieved_pmids, relevant_pmids)
             return reward
         except Exception as e:
