@@ -42,11 +42,9 @@ def setup_ppo_config(device: str) -> PPOConfig:
         "cliprange": 0.2,
         "cliprange_value": 0.2,
         "vf_coef": 0.1,
-        "target_kl": 0.1,
         "seed": 42,
         "log_with": "wandb",
-        "adap_kl_ctrl": True,
-        "init_kl_coef": 0.5,
+        "kl_coef": 0.001,
     }
     # Filter by constructor signature to avoid unexpected-arg errors
     allowed = set(inspect.signature(PPOConfig.__init__).parameters.keys())
@@ -315,7 +313,7 @@ def run_full_training() -> bool:
         num_updates = 600
         batch_size = 16
         max_new_tokens = 32  
-        temperature = 0.7
+        temperature = 0.6
         top_p = 0.9
 
         indices = list(range(len(dataset)))
