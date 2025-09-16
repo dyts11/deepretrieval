@@ -283,9 +283,9 @@ def run_full_training() -> bool:
             "model": "meta-llama/Llama-3.2-3B-Instruct",
     #wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
     #        "model": "Qwen/Qwen2.5-3B-Instruct",
-        "dataset_samples": 600,
+        "dataset_samples": 1000,
         "batch_size": 16,
-        "updates": 600,
+        "updates": 3000,
         "max_new_tokens": 32,
     })
     
@@ -310,7 +310,7 @@ def run_full_training() -> bool:
         print("✅ PPO trainer ready")
         
         # Training parameters
-        num_updates = 600
+        num_updates = 3000
         batch_size = 16
         max_new_tokens = 32  
         temperature = 0.6
