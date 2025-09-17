@@ -35,8 +35,8 @@ def setup_ppo_config(device: str) -> PPOConfig:
     # Even gentler updates to avoid ratio explosions and KL pathologies
     base_cfg = {
         "learning_rate": 1e-6,
-        "batch_size": 16,
-        "mini_batch_size": 4,
+        "batch_size": 64,
+        "mini_batch_size": 16,
         "ppo_epochs": 2,
         "gradient_accumulation_steps": 1,
         "cliprange": 0.2,
@@ -284,8 +284,8 @@ def run_full_training() -> bool:
     #wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
     #        "model": "Qwen/Qwen2.5-3B-Instruct",
         "dataset_samples": 1000,
-        "batch_size": 16,
-        "updates": 3000,
+        "batch_size": 64,
+        "updates": 600,
         "max_new_tokens": 32,
     })
     
@@ -310,8 +310,8 @@ def run_full_training() -> bool:
         print("✅ PPO trainer ready")
         
         # Training parameters
-        num_updates = 3000
-        batch_size = 16
+        num_updates = 600
+        batch_size = 64
         max_new_tokens = 32  
         temperature = 0.6
         top_p = 0.9
