@@ -577,3 +577,96 @@ Experiment 7 definitively proves that **learning rate, not training duration, is
 
 **Training Status**: Learning rate confirmed as the critical bottleneck. Extended training provides no benefit with current configuration. Immediate priority: learning rate optimization.
 
+### experiment 8
+#### training description
+Testing whether larger model capacity affects training dynamics by switching to LLaMA-3.2-3B-Instruct (3B parameters).
+- Model: **NEW** LLaMA-3.2-3B-Instruct (vs previous Qwen2-0.5B-Instruct)
+- Learning rate: 1e-6 (same as previous experiments)
+- Training steps: 600 (reverted from experiment 7)
+- KL penalty: init_kl_coef = 0.5 (same stable configuration)
+- PPO epochs: 2 (same stable configuration)
+- Reward function: Boolean format (same as experiments 6-7)
+- All other hyperparameters identical to stable configuration
+
+Hypothesis: Larger model capacity might improve learning effectiveness or training stability with the same hyperparameters.
+
+#### training results
+![](graph/train_8_train.png)
+![](graph/train_8_policy.png)
+
+#### Detailed Analysis
+
+**Training Stability - SIGNIFICANTLY IMPROVED:**
+- **KL Control Excellent**: KL stays around 0, no large negative values (<-1) anymore
+- **Policy Loss Stable**: Consistently around 0, much more stable than smaller models
+- **Value Function Stable**: Continued excellent stability with larger model
+- **Overall Superior**: Best stability metrics across all experiments
+
+**Reward Learning - STILL LIMITED:**
+- **Higher baseline**: Average rewards better than previous experiments (~0.8-0.9 vs ~0.6-0.7)
+- **No learning curve**: Still flat reward progression during training
+- **Learning rate bottleneck persists**: Model capacity doesn't overcome lr=1e-6 limitation
+- **Initial advantage only**: Better starting performance but no improvement
+
+**Policy Behavior - DIFFERENT DYNAMICS:**
+- **Lower entropy**: Stable around 1.25 (vs 3.0-3.5 in smaller models)
+- **More deterministic**: LLaMA shows less exploration variance
+- **Stable convergence**: No entropy fluctuations throughout training
+- **Different equilibrium**: Larger model settles into different behavioral pattern
+
+**Value Function Performance - EXCELLENT:**
+- **Prediction Error**: Very stable and low throughout training
+- **Explained Variance**: Steady improvement pattern maintained
+- **Clip Fraction**: Low and controlled, indicating appropriate update magnitudes
+
+**Critical Finding: Model Capacity vs Learning Rate Separation**
+
+This experiment reveals that **model capacity affects training stability and baseline performance** but **cannot overcome learning rate bottlenecks**.
+
+#### Key Insights
+
+**Model Capacity Benefits:**
+- **Better KL control**: Larger models handle KL divergence more gracefully
+- **Superior stability**: 3B model shows best stability metrics across all experiments
+- **Higher baseline**: Better initial performance on Boolean query task
+- **More efficient training**: Fewer instabilities and better convergence
+
+**Learning Rate Bottleneck Persistence:**
+- **Fundamental limitation unchanged**: lr=1e-6 still insufficient for learning
+- **Capacity vs gradients**: Larger model capacity cannot compensate for tiny gradient magnitudes
+- **Same plateau effect**: Model reaches performance ceiling quickly despite larger capacity
+- **Parameter update scale**: Still limited by learning rate regardless of model size
+
+**Entropy and Exploration Patterns:**
+- **Lower entropy**: LLaMA more deterministic than Qwen (1.25 vs 3.0-3.5)
+- **Different exploration**: Larger model explores more efficiently
+- **Stable behavior**: No entropy fluctuations suggest well-controlled exploration
+- **Model-dependent patterns**: Different architectures show different baseline behaviors
+
+#### Root Cause Analysis
+
+**Why Larger Model Improves Stability:**
+1. **Better optimization landscape**: More parameters create smoother loss surfaces
+2. **Improved representations**: Better internal representations lead to more stable training
+3. **Enhanced value function**: Larger capacity improves value prediction accuracy
+4. **Architectural benefits**: LLaMA architecture optimizations contribute to stability
+
+**Why Learning Rate Bottleneck Persists:**
+1. **Gradient magnitude dominance**: lr=1e-6 creates fundamentally small updates regardless of model size
+2. **Parameter scaling**: More parameters still receive tiny updates with small learning rates
+3. **Optimization fundamentals**: Model capacity cannot overcome insufficient gradient magnitudes
+4. **Mathematical constraint**: Δθ = lr × gradient applies regardless of model size
+
+**Entropy Differences Explained:**
+1. **Architectural differences**: LLaMA vs Qwen baseline behavior differences
+2. **Scale effects**: Larger models may naturally be more confident/deterministic
+3. **Training dynamics**: Different model sizes reach different entropy equilibria
+4. **Representation quality**: Better representations lead to more confident outputs
+
+#### Conclusion:
+Experiment 8 reveals that **larger model capacity significantly improves training stability and baseline performance** but **cannot overcome learning rate bottlenecks**. LLaMA-3.2-3B shows the best stability metrics across all experiments while maintaining the same learning limitations.
+
+**Key Finding**: Model capacity and learning rate have **complementary but independent effects** - larger models provide better stability foundation, but learning rate still controls learning effectiveness.
+
+**Training Status**: Optimal stability achieved with large model + proven hyperparameters. Learning rate remains the critical bottleneck requiring systematic exploration.
+
