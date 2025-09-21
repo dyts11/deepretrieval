@@ -130,7 +130,7 @@ def prepare_dataset_for_grpo(max_samples: int = 1000) -> Dataset:
     
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
-        data_path="data/train.jsonl", 
+        data_path="data/fill_train.jsonl", 
         max_samples=max_samples,
     )
     
@@ -178,15 +178,6 @@ def run_grpo_training() -> bool:
     )
     
     try:
-        # Silence repetitive warnings
-        hf_logging.set_verbosity_error()
-        warnings.filterwarnings(
-            "ignore",
-            message="Caching is incompatible with gradient checkpointing",
-            category=UserWarning,
-            module="transformers",
-        )
-        
         print("🤖 Setting up GRPO training...")
         
         # Setup components
