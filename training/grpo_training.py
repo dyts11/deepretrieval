@@ -51,6 +51,9 @@ def setup_grpo_config() -> GRPOConfig:
         # Optimization settings
         gradient_checkpointing=True,              # Memory optimization
         bf16=True,                               # Use bfloat16 for stability
+            
+        # Memory optimization for GRPO
+        optim="adamw_8bit",                      # Use 8-bit optimizer to save memory
         
         # Logging and output
         output_dir="models/grpo_training_output",
@@ -123,7 +126,7 @@ def setup_reward_function():
     return grpo_reward_function
 
 
-def prepare_dataset_for_grpo(max_samples: int = 1000) -> Dataset:
+def prepare_dataset_for_grpo() -> Dataset:
     """
     Prepare dataset for GRPO training using existing data loading.
     """
@@ -132,7 +135,6 @@ def prepare_dataset_for_grpo(max_samples: int = 1000) -> Dataset:
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
         data_path="data/full_train.jsonl", 
-        max_samples=max_samples,
     )
     
     # Convert to format expected by GRPO
@@ -171,7 +173,6 @@ def run_grpo_training() -> bool:
         config={
             "model": "meta-llama/Llama-3.2-3B-Instruct",
             "algorithm": "GRPO",
-            "dataset_samples": 1000,
             "num_completions_per_prompt": 4,
             "learning_rate": 1e-6,
             "max_completion_length": 32,
@@ -184,7 +185,7 @@ def run_grpo_training() -> bool:
         # Setup components
         config = setup_grpo_config()
         reward_function = setup_reward_function()
-        dataset = prepare_dataset_for_grpo(max_samples=1000)
+        dataset = prepare_dataset_for_grpo()
         
         print("🔧 Initializing GRPO trainer...")
         
