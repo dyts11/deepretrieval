@@ -35,12 +35,15 @@ def setup_grpo_config() -> GRPOConfig:
     config = GRPOConfig(
         # Core training parameters (using correct GRPO parameter names)
         learning_rate=1e-6,                       # Proven stable learning rate
-        per_device_train_batch_size=4,            # Per-device batch size
-        gradient_accumulation_steps=4,            # Compensate for smaller batch size
+        #per_device_train_batch_size=4,            # Per-device batch size
+        #gradient_accumulation_steps=4,            # Compensate for smaller batch size
+        per_device_train_batch_size=1,            # Reduced for memory constraints
+        gradient_accumulation_steps=8,
         num_train_epochs=1,                       # Based on 600 updates
         
         # GRPO-specific parameters
-        num_generations=4,                        # Generate 4 completions per prompt for comparison
+        #num_generations=4,                        # Generate 4 completions per prompt for comparison
+        num_generations=2, 
         max_completion_length=32,                 # Same as max_new_tokens in PPO
         temperature=0.6,                          # Same generation parameters
         top_p=0.9,
@@ -52,8 +55,6 @@ def setup_grpo_config() -> GRPOConfig:
         gradient_checkpointing=True,              # Memory optimization
         bf16=True,                               # Use bfloat16 for stability
             
-        # Memory optimization for GRPO
-        optim="adamw_8bit",                      # Use 8-bit optimizer to save memory
         
         # Logging and output
         output_dir="models/grpo_training_output",
