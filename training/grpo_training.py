@@ -40,7 +40,7 @@ def setup_grpo_config() -> GRPOConfig:
         num_train_epochs=1,                       # Based on 600 updates
         
         # GRPO-specific parameters
-        num_completions_per_prompt=4,             # Generate 4 completions per prompt for comparison
+        num_generations=4,                        # Generate 4 completions per prompt for comparison
         max_completion_length=32,                 # Same as max_new_tokens in PPO
         temperature=0.6,                          # Same generation parameters
         top_p=0.9,
