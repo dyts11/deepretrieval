@@ -33,23 +33,24 @@ def setup_grpo_config() -> GRPOConfig:
     """Setup GRPO configuration based on stable experiment 8 hyperparameters."""
     
     config = GRPOConfig(
-        learning_rate=1e-6,                    # Proven stable learning rate
-        batch_size=16,                         # Reduced for multiple completions per prompt
-        gradient_accumulation_steps=4,         # Compensate for smaller batch size
-        num_train_epochs=1,                    # Based on 600 updates
+        # Core training parameters (using correct GRPO parameter names)
+        learning_rate=1e-6,                       # Proven stable learning rate
+        per_device_train_batch_size=4,            # Per-device batch size
+        gradient_accumulation_steps=4,            # Compensate for smaller batch size
+        num_train_epochs=1,                       # Based on 600 updates
         
         # GRPO-specific parameters
-        num_completions_per_prompt=4,          # Generate 4 completions per prompt for comparison
-        max_completion_length=32,              # Same as max_new_tokens in PPO
-        temperature=0.6,                       # Same generation parameters
+        num_completions_per_prompt=4,             # Generate 4 completions per prompt for comparison
+        max_completion_length=32,                 # Same as max_new_tokens in PPO
+        temperature=0.6,                          # Same generation parameters
         top_p=0.9,
         
         # KL control (adapted from PPO kl_coef=0.001)
-        beta=0.001,                           # KL penalty coefficient
+        beta=0.001,                              # KL penalty coefficient
         
         # Optimization settings
-        gradient_checkpointing=True,           # Memory optimization
-        bf16=True,                            # Use bfloat16 for stability
+        gradient_checkpointing=True,              # Memory optimization
+        bf16=True,                               # Use bfloat16 for stability
         
         # Logging and output
         output_dir="models/grpo_training_output",
