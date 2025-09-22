@@ -56,13 +56,7 @@ def setup_grpo_config() -> GRPOConfig:
         bf16=True,                               # Use bfloat16 for stability
         dataloader_num_workers=0,                 # Reduce memory usage
         max_grad_norm=1.0,                       # Gradient clipping
-        optim="adamw_8bit",                      # Use 8-bit optimizer
-        
-        # Additional memory optimizations
-        save_strategy="no",                      # Don't save checkpoints during training
-        evaluation_strategy="no",                # Skip evaluation to save memory
-            
-        
+             
         # Logging and output
         output_dir="models/grpo_training_output",
         logging_steps=1,
