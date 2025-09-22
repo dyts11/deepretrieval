@@ -54,6 +54,13 @@ def setup_grpo_config() -> GRPOConfig:
         # Optimization settings
         gradient_checkpointing=True,              # Memory optimization
         bf16=True,                               # Use bfloat16 for stability
+        dataloader_num_workers=0,                 # Reduce memory usage
+        max_grad_norm=1.0,                       # Gradient clipping
+        optim="adamw_8bit",                      # Use 8-bit optimizer
+        
+        # Additional memory optimizations
+        save_strategy="no",                      # Don't save checkpoints during training
+        evaluation_strategy="no",                # Skip evaluation to save memory
             
         
         # Logging and output
@@ -170,13 +177,17 @@ def run_grpo_training() -> bool:
     # Initialize wandb
     wandb.init(
         project="deepretrieval-grpo", 
-        name="grpo-llama32-3b-experiment",
+        #name="grpo-llama32-3b-experiment",
+        name="grpo-qwen2-0.5b-experiment",
         config={
-            "model": "meta-llama/Llama-3.2-3B-Instruct",
+            #"model": "meta-llama/Llama-3.2-3B-Instruct",
+            "model": "Qwen/Qwen2-0.5B-Instruct",
             "algorithm": "GRPO",
-            "num_completions_per_prompt": 4,
+            "num_generations": 2,
             "learning_rate": 1e-6,
             "max_completion_length": 32,
+            "per_device_batch_size": 1,
+            "gradient_accumulation_steps": 8,
         }
     )
     
@@ -192,7 +203,8 @@ def run_grpo_training() -> bool:
         
         # Create GRPO trainer
         trainer = GRPOTrainer(
-            model="meta-llama/Llama-3.2-3B-Instruct",  # Stable model from experiment 8
+            #model="meta-llama/Llama-3.2-3B-Instruct",  # Stable model from experiment 8
+            model="Qwen/Qwen2-0.5B-Instruct",
             reward_funcs=reward_function,
             args=config,
             train_dataset=dataset,
