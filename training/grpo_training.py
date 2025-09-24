@@ -37,13 +37,13 @@ def setup_grpo_config() -> GRPOConfig:
         learning_rate=1e-6,                       # Proven stable learning rate
         #per_device_train_batch_size=4,            # Per-device batch size
         #gradient_accumulation_steps=4,            # Compensate for smaller batch size
-        per_device_train_batch_size=1,            # Reduced for memory constraints
-        gradient_accumulation_steps=8,
+        per_device_train_batch_size=4,            # Reduced for memory constraints
+        gradient_accumulation_steps=4,
         num_train_epochs=1,                       # Based on 600 updates
         
         # GRPO-specific parameters
         #num_generations=4,                        # Generate 4 completions per prompt for comparison
-        num_generations=2, 
+        num_generations=4, 
         max_completion_length=32,                 # Same as max_new_tokens in PPO
         temperature=0.6,                          # Same generation parameters
         top_p=0.9,
