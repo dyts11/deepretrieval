@@ -137,7 +137,7 @@ def prepare_dataset_for_grpo() -> Dataset:
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
         data_path="data/full_train.jsonl",
-        max_samples=10000  # Use 1000 samples for meaningful training
+        max_samples=1000  # Use 1000 samples for meaningful training
     )
     
     # Convert to format expected by GRPO
