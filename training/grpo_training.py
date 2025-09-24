@@ -136,7 +136,7 @@ def prepare_dataset_for_grpo() -> Dataset:
     
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
-        data_path="data/train.jsonl", 
+        data_path="data/full_strain.jsonl", 
     )
     
     # Convert to format expected by GRPO
