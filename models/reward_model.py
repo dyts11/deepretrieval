@@ -86,8 +86,6 @@ class RetrievalRewardModel(nn.Module):
         query: str,
         relevant_pmids: List[str]
     ) -> float:
-        if not relevant_pmids:
-            return self.min_reward
         try:
             # 1) Retrieve with the full query first
             retrieved_pmids = self.pubmed_api.search_with_keywords(query, topk=self.top_k)
