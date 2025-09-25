@@ -48,7 +48,7 @@ class RetrievalRewardModel(nn.Module):
         min_reward: float = 0.0,
         max_reward: float = 5.0,
         # weights (retrieval-only by default)
-        w_recall: float = 0.9,
+        w_recall: float = 1,
         w_precision: float = 0,
         w_ndcg: float = 0,
         w_mrr: float = 0,
@@ -141,10 +141,10 @@ class RetrievalRewardModel(nn.Module):
             length = len(q)
             #reward = (2 - length/16) * 0.1
             retrieved_num = len(retrieved_set)
-            if retrieved_num < 10:
-                reward += 0.1 * retrieved_num/10
-            else:
-                reward += 0.1
+            #if retrieved_num < 10:
+            #    reward += 0.1 * retrieved_num/10
+            #else:
+            #    reward += 0.1
             # 4) Boolean query format reward
             query = query.strip()
             query_upper = query.upper()
