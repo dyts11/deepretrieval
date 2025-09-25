@@ -349,48 +349,51 @@ def run_full_training() -> bool:
 
         print("\n🚀 Starting PPO training...")
 
-        # Modern TRL PPO Training Loop - Use dataloader approach
-        sample_idx = 0
-        for batch in tqdm(ppo_trainer.dataloader, desc="PPO Batches"):
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                
+        # Modern TRL Training Loop - Following Medium article pattern
+        batch_count = 0
+        for batch in tqdm(ppo_trainer.dataloader, desc="PPO Training"):
+            # Get tokenized prompts (input_ids)
             query_tensors = batch["input_ids"]
-            batch_size = len(query_tensors)
             
-            # Generate responses from SFT model
-            generation_kwargs = {
-                "max_new_tokens": max_new_tokens,
-                "temperature": temperature,
-                "top_p": top_p,
-                "do_sample": True,
-                "pad_token_id": tokenizer.pad_token_id,
-                "eos_token_id": tokenizer.eos_token_id,
-            }
+            # Generate responses from the model
+            response_tensors = ppo_trainer.model.generate(
+                query_tensors,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                do_sample=True,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
             
-            response_tensors = ppo_trainer.generate(query_tensors, **generation_kwargs)
+            # Decode generated responses
+            responses = [tokenizer.decode(output, skip_special_tokens=True) for output in response_tensors]
             
-            # Decode responses for reward computation
-            batch["response"] = [tokenizer.decode(r.squeeze()) for r in response_tensors]
+            # Extract boolean queries from responses for reward computation
+            decoded_queries = [extract_boolean_query(resp) for resp in responses]
             
-            # Get corresponding relevant docs using the original data mapping
+            # Get corresponding relevant docs for this batch
             batch_relevant = []
-            for i in range(batch_size):
-                if sample_idx + i < len(original_data):
-                    batch_relevant.append(original_data[sample_idx + i]["relevant_doc_ids"])
+            for i in range(len(query_tensors)):
+                data_idx = batch_count * len(query_tensors) + i
+                if data_idx < len(original_data):
+                    batch_relevant.append(original_data[data_idx]["relevant_doc_ids"])
                 else:
-                    batch_relevant.append([])  # Fallback for edge cases
+                    batch_relevant.append([])  # Fallback
             
-            # Compute rewards
-            decoded_responses = [extract_boolean_query(resp) for resp in batch["response"]]
-            rewards_list = reward_model.compute_rewards_batch(decoded_responses, batch_relevant)
+            # Compute rewards using the reward model
+            rewards_list = reward_model.compute_rewards_batch(decoded_queries, batch_relevant)
             rewards = [torch.tensor(r, dtype=torch.float32) for r in rewards_list]
             
-            # Run PPO step
+            # Perform PPO step - this is where the actual RL training happens
             stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
-            ppo_trainer.log_stats(stats, batch, rewards)
             
-            sample_idx += batch_size
+            print(f"Batch {batch_count} - avg reward: {np.mean(rewards_list):.3f}")
+            batch_count += 1
+            
+            # Optional: Clean up GPU memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         # Save final model and tokenizer
         #print("\n💾 Saving final model...")
