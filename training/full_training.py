@@ -311,7 +311,6 @@ def run_full_training() -> bool:
             processing_class=tokenizer,
             reward_model=reward_model,
             train_dataset=dataset,
-            value_model=None,  # Policy model already has value head
             model=policy_model,
             ref_model=ref_model,
             value_model=policy_model,  # Use same model for both policy and value
