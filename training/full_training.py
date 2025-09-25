@@ -113,12 +113,6 @@ def load_model_and_tokenizer():
     if not hasattr(ref_model, 'generation_config'):
         ref_model.generation_config = GenerationConfig.from_model_config(ref_model.config)
 
-    # Reduce training memory footprint
-    policy_model.gradient_checkpointing_enable()
-    ref_model.gradient_checkpointing_enable()
-    policy_model.config.use_cache = False
-    ref_model.config.use_cache = False
-
     print(f"✅ Models loaded on {device} | dtype={dtype}")
     return policy_model, ref_model, tokenizer
 
