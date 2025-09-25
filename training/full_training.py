@@ -288,6 +288,24 @@ def run_full_training() -> bool:
         ppo_config = setup_ppo_config(device)
         policy_model, ref_model, tokenizer = load_model_and_tokenizer()
         dataset = prepare_dataset_for_training(max_samples=1000)
+        
+        # Tokenize dataset for TRL - add input_ids
+        def tokenize_function(examples):
+            # Tokenize the query text
+            encoded = tokenizer(
+                examples["query"],
+                truncation=True,
+                padding=False,  # Will be done by data collator
+                max_length=512,
+                return_tensors=None  # Return lists, not tensors
+            )
+            # Keep the original fields too
+            encoded["relevant_doc_ids"] = examples["relevant_doc_ids"]
+            encoded["query"] = examples["query"]  # Keep original text for reward computation
+            return encoded
+        
+        dataset = dataset.map(tokenize_function, batched=True)
+        
         reward_model = setup_reward_model()
         
         # Fix TRL compatibility issues with AutoModelForCausalLMWithValueHead
@@ -339,16 +357,20 @@ def run_full_training() -> bool:
             batch["response"] = [tokenizer.decode(r.squeeze()) for r in response_tensors]
             
             # Get corresponding relevant docs for this batch
-            batch_queries = [tokenizer.decode(q, skip_special_tokens=True) for q in query_tensors]
-            batch_relevant = []
-            for query_text in batch_queries:
-                # Find matching dataset entry (this is simplified - you may need better matching)
-                for item in dataset:
-                    if query_text.strip() in item["query"].strip():
-                        batch_relevant.append(item["relevant_doc_ids"])
-                        break
-                else:
-                    batch_relevant.append([])  # Fallback empty list
+            # The batch should now contain the relevant_doc_ids directly
+            if "relevant_doc_ids" in batch:
+                batch_relevant = batch["relevant_doc_ids"]
+            else:
+                # Fallback: decode and match (less efficient)
+                batch_queries = [tokenizer.decode(q, skip_special_tokens=True) for q in query_tensors]
+                batch_relevant = []
+                for query_text in batch_queries:
+                    for item in dataset:
+                        if query_text.strip() in item["query"].strip():
+                            batch_relevant.append(item["relevant_doc_ids"])
+                            break
+                    else:
+                        batch_relevant.append([])  # Fallback empty list
             
             # Compute rewards
             decoded_responses = [extract_boolean_query(resp) for resp in batch["response"]]
