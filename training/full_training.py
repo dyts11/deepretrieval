@@ -303,9 +303,6 @@ def run_full_training() -> bool:
             args=ppo_config,
             model=policy_model,
             ref_model=ref_model,
-            tokenizer=tokenizer,
-            dataset=None,
-            data_collator=None,
         )
         print("✅ PPO trainer ready")
         
