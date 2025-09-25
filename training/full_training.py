@@ -35,9 +35,9 @@ def setup_ppo_config(device: str) -> PPOConfig:
     # Even gentler updates to avoid ratio explosions and KL pathologies
     base_cfg = {
         "learning_rate": 1e-6,
-        "batch_size": 64,
-        "mini_batch_size": 16,
-        "ppo_epochs": 2,
+        "per_device_train_batch_size": 64,
+        "num_mini_batches": 16,
+        "num_ppo_epochs": 2,
         "gradient_accumulation_steps": 1,
         "cliprange": 0.2,
         "cliprange_value": 0.2,
@@ -294,13 +294,17 @@ def run_full_training() -> bool:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         ppo_config = setup_ppo_config(device)
         policy_model, ref_model, tokenizer = load_model_and_tokenizer()
-        reward_model = setup_reward_model()
         dataset = prepare_dataset_for_training(max_samples=1000)
+        reward_model = setup_reward_model()
         
         # PPO trainer
         print("\n🔧 Initializing PPO trainer...")
         ppo_trainer = PPOTrainer(
             args=ppo_config,
+            processing_class=tokenizer,
+            reward_model=reward_model,
+            train_dataset=dataset,
+            value_model=None,  # Policy model already has value head
             model=policy_model,
             ref_model=ref_model,
         )
