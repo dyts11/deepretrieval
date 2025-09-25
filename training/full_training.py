@@ -355,16 +355,16 @@ def run_full_training() -> bool:
             # Get tokenized prompts (input_ids)
             query_tensors = batch["input_ids"]
             
-            # Generate responses from the model
-            response_tensors = ppo_trainer.model.generate(
-                query_tensors,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                do_sample=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-            )
+            # Generate responses using PPO trainer's generate method
+            generation_kwargs = {
+                "max_new_tokens": max_new_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "do_sample": True,
+                "pad_token_id": tokenizer.pad_token_id,
+                "eos_token_id": tokenizer.eos_token_id,
+            }
+            response_tensors = ppo_trainer.generate(query_tensors, **generation_kwargs)
             
             # Decode generated responses
             responses = [tokenizer.decode(output, skip_special_tokens=True) for output in response_tensors]
