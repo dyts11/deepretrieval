@@ -310,7 +310,7 @@ def run_full_training() -> bool:
         print("✅ PPO trainer ready")
         
         # Training parameters
-        num_updates = 1000
+        num_updates = 600
         batch_size = 64
         max_new_tokens = 32  
         temperature = 0.6
