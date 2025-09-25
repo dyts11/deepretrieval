@@ -309,161 +309,55 @@ def run_full_training() -> bool:
         )
         print("✅ PPO trainer ready")
         
-        # Training parameters
-        num_updates = 600
-        batch_size = 64
+        # Training parameters 
         max_new_tokens = 32  
         temperature = 0.6
         top_p = 0.9
 
-        indices = list(range(len(dataset)))
-        device_obj = next(ppo_trainer.model.parameters()).device
+        print("\n🚀 Starting PPO training...")
 
-        print("\n🚀 Starting PPO updates...")
-        progress = tqdm(range(num_updates), desc="PPO Updates")
-
-        for update_idx in progress:
+        # Modern TRL PPO Training Loop - Use dataloader approach
+        for batch in tqdm(ppo_trainer.dataloader, desc="PPO Batches"):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            # Sample a random mini-batch
-            batch_indices = random.sample(indices, batch_size)
-            batch_prompts = [dataset[i]["query"] for i in batch_indices]
-            batch_relevant = [dataset[i]["relevant_doc_ids"] for i in batch_indices]
-                    
-            # Build query tensors as list for TRL API
-            query_tensors = [
-                tokenizer(p, return_tensors="pt", truncation=True, max_length=512).input_ids.squeeze(0).to(device_obj)
-                for p in batch_prompts
-            ]
-                    
-            ppo_trainer.model.eval()
-            # Use TRL's generate helper to ensure consistent masks/logprobs for KL
-            with torch.no_grad():
-                response_tensors = ppo_trainer.generate(
-                    query_tensors,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    top_p=top_p,
-                    do_sample=True,
-                    pad_token_id=tokenizer.pad_token_id,
-                    eos_token_id=tokenizer.eos_token_id,
-                )
-                    
-            # Slice continuations and decode relative to prompts
-            cont_tensors = []
-            decoded_responses = []
-            for q_ids, r_ids, prompt in zip(query_tensors, response_tensors, batch_prompts):
-                input_len = q_ids.shape[-1]
-                cont = r_ids[input_len:]
-                cont_tensors.append(cont)
-                raw = tokenizer.decode(cont, skip_special_tokens=True)
-                decoded_responses.append(raw)
-
-            response_tensors = cont_tensors
-
-            # Filter invalid/empty continuations and off-format outputs prior to PPO
-            #def is_valid_text(s: str) -> bool:
-            #    if not s:
-            #        return False
-            #    U = f" {s.upper()} "
-            #    has_bool = (" AND " in U) or (" OR " in U) or (" NOT " in U)
-            #    ascii_ratio = sum(1 for ch in s if ord(ch) < 128) / max(1, len(s))
-            #    return has_bool and (ascii_ratio >= 0.8)
-
-            #mask = [ (c.numel() > 0) and is_valid_text(t) for c, t in zip(response_tensors, decoded_responses) ]
-            #if not any(mask):
-            #    # Skip this update if nothing valid
-            #    continue
-            ## Apply mask consistently
-            #query_tensors = [q for q, m in zip(query_tensors, mask) if m]
-            #response_tensors = [c for c, m in zip(response_tensors, mask) if m]
-            #decoded_responses = [t for t, m in zip(decoded_responses, mask) if m]
-            #batch_relevant = [r for r, m in zip(batch_relevant, mask) if m]
-
-            # Compute rewards (batch)
+                
+            query_tensors = batch["input_ids"]
+            
+            # Generate responses from SFT model
+            generation_kwargs = {
+                "max_new_tokens": max_new_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "do_sample": True,
+                "pad_token_id": tokenizer.pad_token_id,
+                "eos_token_id": tokenizer.eos_token_id,
+            }
+            
+            response_tensors = ppo_trainer.generate(query_tensors, **generation_kwargs)
+            
+            # Decode responses for reward computation
+            batch["response"] = [tokenizer.decode(r.squeeze()) for r in response_tensors]
+            
+            # Get corresponding relevant docs for this batch
+            batch_queries = [tokenizer.decode(q, skip_special_tokens=True) for q in query_tensors]
+            batch_relevant = []
+            for query_text in batch_queries:
+                # Find matching dataset entry (this is simplified - you may need better matching)
+                for item in dataset:
+                    if query_text.strip() in item["query"].strip():
+                        batch_relevant.append(item["relevant_doc_ids"])
+                        break
+                else:
+                    batch_relevant.append([])  # Fallback empty list
+            
+            # Compute rewards
+            decoded_responses = [extract_boolean_query(resp) for resp in batch["response"]]
             rewards_list = reward_model.compute_rewards_batch(decoded_responses, batch_relevant)
-            avg_reward = float(np.mean(rewards_list)) if len(rewards_list) > 0 else 0.0
-            # TRL expects scores as list of torch tensors
-            scores = [torch.tensor(r, dtype=torch.float32, device=device_obj) for r in rewards_list]
-
-            # PPO update step
-            stats = ppo_trainer.step(query_tensors, response_tensors, scores)
+            rewards = [torch.tensor(r, dtype=torch.float32) for r in rewards_list]
             
-            # Extract metrics (handle numpy arrays)
-            def extract_metric(stats_dict, key, default=0.0):
-                value = stats_dict.get(key, default)
-                if hasattr(value, '__iter__') and not isinstance(value, str):
-                    try:
-                        return float(value[0]) if len(value) > 0 else default
-                    except (IndexError, TypeError):
-                        return default
-                return float(value) if isinstance(value, (int, float)) else default
-            
-            # Core PPO metrics
-            #kl_value = extract_metric(stats, "objective/kl")
-            kl_value = float(stats.get("objective/kl", 0.0))
-            policy_loss_value = extract_metric(stats, "ppo/loss/policy")
-            value_loss_value = extract_metric(stats, "ppo/loss/value")
-            total_loss_value = extract_metric(stats, "ppo/loss/total")
-
-            # Policy evaluation metrics
-            entropy_value = extract_metric(stats, "ppo/policy/entropy")
-            approx_kl_value = extract_metric(stats, "ppo/policy/approxkl")
-            clip_fraction = extract_metric(stats, "ppo/policy/clipfrac")
-            advantages_mean = extract_metric(stats, "ppo/policy/advantages_mean")
-            
-            # Value function metrics
-            value_error = extract_metric(stats, "ppo/val/error")
-            value_clip_fraction = extract_metric(stats, "ppo/val/clipfrac")
-            explained_variance = extract_metric(stats, "ppo/val/var_explained")
-            
-            # Reward and score metrics
-            mean_scores = float(stats.get("ppo/mean_scores", 0.0))
-            std_scores = float(stats.get("ppo/std_scores", 0.0))
-            
-            # Token length metrics
-            query_len_mean = extract_metric(stats, "tokens/queries_len_mean")
-            response_len_mean = extract_metric(stats, "tokens/responses_len_mean")
-            
-            # Log comprehensive metrics
-            wandb.log({
-                # Core training metrics
-                "train/update": update_idx,
-                "train/avg_reward": avg_reward,
-                "train/kl": kl_value,
-                "train/policy_loss": policy_loss_value,
-                "train/value_loss": value_loss_value,
-                "train/total_loss": total_loss_value,
-                
-                # Policy evaluation
-                "policy/entropy": entropy_value,
-                "policy/approx_kl": approx_kl_value,
-                "policy/clip_fraction": clip_fraction,
-                "policy/advantages_mean": advantages_mean,
-                
-                # Value function evaluation
-                "value/prediction_error": value_error,
-                "value/clip_fraction": value_clip_fraction,
-                "value/explained_variance": explained_variance,
-                
-                # Reward analysis
-                "ppo/mean_scores": mean_scores,
-                "ppo/std_scores": std_scores,
-                
-                # Generation analysis
-                "generation/query_length": query_len_mean,
-                "generation/response_length": response_len_mean,
-            })
-            progress.set_postfix({
-                "avg_reward": f"{avg_reward:.3f}", 
-                "kl": f"{kl_value:.3f}", 
-                "policy_loss": f"{policy_loss_value:.3f}", 
-                "value_loss": f"{value_loss_value:.3f}"
-            })
-
-            # Optional: free GPU cache periodically
-            if torch.cuda.is_available() and (update_idx + 1) % 10 == 0:
-                torch.cuda.empty_cache()
+            # Run PPO step
+            stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
+            ppo_trainer.log_stats(stats, batch, rewards)
 
         # Save final model and tokenizer
         #print("\n💾 Saving final model...")
