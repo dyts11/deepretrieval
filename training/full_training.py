@@ -299,12 +299,27 @@ def run_full_training() -> bool:
                 max_length=512,
                 return_tensors=None  # Return lists, not tensors
             )
-            # Keep the original fields too
-            encoded["relevant_doc_ids"] = examples["relevant_doc_ids"]
-            encoded["query"] = examples["query"]  # Keep original text for reward computation
             return encoded
         
+        # Apply tokenization
         dataset = dataset.map(tokenize_function, batched=True)
+        
+        # Remove non-tensor columns that would confuse the data collator
+        # Keep only the tokenizer outputs (input_ids, attention_mask, etc.)
+        tokenizer_columns = ['input_ids', 'attention_mask']
+        if hasattr(tokenizer, 'token_type_ids') and 'token_type_ids' in dataset.column_names:
+            tokenizer_columns.append('token_type_ids')
+        
+        # Create a mapping from indices to original data for reward computation
+        original_data = []
+        for i, item in enumerate(dataset):
+            original_data.append({
+                "query": item["query"],
+                "relevant_doc_ids": item["relevant_doc_ids"]
+            })
+        
+        # Filter dataset to only include tokenizer columns
+        dataset = dataset.remove_columns([col for col in dataset.column_names if col not in tokenizer_columns])
         
         reward_model = setup_reward_model()
         
@@ -335,11 +350,13 @@ def run_full_training() -> bool:
         print("\n🚀 Starting PPO training...")
 
         # Modern TRL PPO Training Loop - Use dataloader approach
+        sample_idx = 0
         for batch in tqdm(ppo_trainer.dataloader, desc="PPO Batches"):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 
             query_tensors = batch["input_ids"]
+            batch_size = len(query_tensors)
             
             # Generate responses from SFT model
             generation_kwargs = {
@@ -356,21 +373,13 @@ def run_full_training() -> bool:
             # Decode responses for reward computation
             batch["response"] = [tokenizer.decode(r.squeeze()) for r in response_tensors]
             
-            # Get corresponding relevant docs for this batch
-            # The batch should now contain the relevant_doc_ids directly
-            if "relevant_doc_ids" in batch:
-                batch_relevant = batch["relevant_doc_ids"]
-            else:
-                # Fallback: decode and match (less efficient)
-                batch_queries = [tokenizer.decode(q, skip_special_tokens=True) for q in query_tensors]
-                batch_relevant = []
-                for query_text in batch_queries:
-                    for item in dataset:
-                        if query_text.strip() in item["query"].strip():
-                            batch_relevant.append(item["relevant_doc_ids"])
-                            break
-                    else:
-                        batch_relevant.append([])  # Fallback empty list
+            # Get corresponding relevant docs using the original data mapping
+            batch_relevant = []
+            for i in range(batch_size):
+                if sample_idx + i < len(original_data):
+                    batch_relevant.append(original_data[sample_idx + i]["relevant_doc_ids"])
+                else:
+                    batch_relevant.append([])  # Fallback for edge cases
             
             # Compute rewards
             decoded_responses = [extract_boolean_query(resp) for resp in batch["response"]]
@@ -380,6 +389,8 @@ def run_full_training() -> bool:
             # Run PPO step
             stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
             ppo_trainer.log_stats(stats, batch, rewards)
+            
+            sample_idx += batch_size
 
         # Save final model and tokenizer
         #print("\n💾 Saving final model...")
