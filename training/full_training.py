@@ -106,6 +106,13 @@ def load_model_and_tokenizer():
     policy_model.config.eos_token_id = tokenizer.eos_token_id
     ref_model.config.eos_token_id = tokenizer.eos_token_id
 
+    # Fix generation_config access for TRL compatibility
+    from transformers import GenerationConfig
+    if not hasattr(policy_model, 'generation_config'):
+        policy_model.generation_config = GenerationConfig.from_model_config(policy_model.config)
+    if not hasattr(ref_model, 'generation_config'):
+        ref_model.generation_config = GenerationConfig.from_model_config(ref_model.config)
+
     # Reduce training memory footprint
     policy_model.gradient_checkpointing_enable()
     ref_model.gradient_checkpointing_enable()
