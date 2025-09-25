@@ -57,14 +57,6 @@ def load_model_and_tokenizer():
     #print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
     print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
     #print("🤖 Loading Qwen/Qwen2.5-3B-Instruct policy and reference models...")
-    # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
-    hf_logging.set_verbosity_error()
-    warnings.filterwarnings(
-        "ignore",
-        message="Caching is incompatible with gradient checkpointing",
-        category=UserWarning,
-        module="transformers",
-    )
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # Use bfloat16 for larger models to save memory while maintaining stability
@@ -298,6 +290,12 @@ def run_full_training() -> bool:
         dataset = prepare_dataset_for_training(max_samples=1000)
         reward_model = setup_reward_model()
         
+        # Fix TRL compatibility issues with AutoModelForCausalLMWithValueHead
+        if not hasattr(policy_model, 'is_gradient_checkpointing'):
+            policy_model.is_gradient_checkpointing = True
+        if not hasattr(ref_model, 'is_gradient_checkpointing'):
+            ref_model.is_gradient_checkpointing = True
+
         # PPO trainer
         print("\n🔧 Initializing PPO trainer...")
         ppo_trainer = PPOTrainer(
