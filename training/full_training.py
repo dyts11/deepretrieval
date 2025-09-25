@@ -313,7 +313,7 @@ def run_full_training() -> bool:
             train_dataset=dataset,
             model=policy_model,
             ref_model=ref_model,
-            value_model=policy_model,  # Use same model for both policy and value
+            value_model=policy_model.pretrained_model,  # Use same model for both policy and value
         )
         print("✅ PPO trainer ready")
         
