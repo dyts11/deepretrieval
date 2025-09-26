@@ -139,7 +139,7 @@ def prepare_dataset_for_grpo() -> tuple[Dataset, Dict[str, List[str]]]:
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
         data_path="data/full_train.jsonl",
-        max_samples=1000  # Use 1000 samples for meaningful training
+        max_samples=100  # Use 1000 samples for meaningful training
     )
     
     # Create mapping from prompts to relevant documents
@@ -182,11 +182,11 @@ def run_grpo_training() -> bool:
     # Initialize wandb
     wandb.init(
         project="deepretrieval-grpo", 
-        #name="grpo-llama32-3b-experiment",
-        name="grpo-qwen2-0.5b-experiment",
+        name="grpo-llama32-3b-experiment",
+        #name="grpo-qwen2-0.5b-experiment",
         config={
-            #"model": "meta-llama/Llama-3.2-3B-Instruct",
-            "model": "Qwen/Qwen2-0.5B-Instruct",
+            "model": "meta-llama/Llama-3.2-3B-Instruct",
+            #"model": "Qwen/Qwen2-0.5B-Instruct",
             "algorithm": "GRPO",
             "num_generations": 2,
             "learning_rate": 1e-6,
@@ -208,8 +208,8 @@ def run_grpo_training() -> bool:
         
         # Create GRPO trainer
         trainer = GRPOTrainer(
-            #model="meta-llama/Llama-3.2-3B-Instruct",  # Stable model from experiment 8
-            model="Qwen/Qwen2-0.5B-Instruct",
+            "meta-llama/Llama-3.2-3B-Instruct",  # Stable model from experiment 8
+            #model="Qwen/Qwen2-0.5B-Instruct",
             reward_funcs=reward_function,
             args=config,
             train_dataset=dataset,
