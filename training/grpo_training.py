@@ -74,63 +74,65 @@ def setup_grpo_config() -> GRPOConfig:
     return config
 
 
-def setup_reward_function():
+def setup_reward_function(prompt_to_relevant_docs: Dict[str, List[str]]):
     """Setup reward function for GRPO using existing reward model."""
     print("🎯 Setting up reward model for GRPO...")
     
     # Use existing reward model with same configuration as PPO training
     reward_model = create_reward_model(top_k=100, reward_scale=1.0)
     
-    def grpo_reward_function(completions: List[List[Dict[str, Any]]], **kwargs) -> List[float]:
+    def grpo_reward_function(prompts, completions, **kwargs) -> List[float]:
         """
         GRPO reward function that processes multiple completions per prompt.
         Uses existing reward model's compute_rewards_batch method.
         
         Args:
-            completions: List of completions, each completion is a list with dict containing 'content'
-            **kwargs: Additional arguments (may include prompts, etc.)
+            prompts: List of original prompts used to generate completions
+            completions: List of generated completions (strings)
+            **kwargs: Additional arguments from dataset columns
             
         Returns:
             List of reward scores for each completion
         """
-        # Extract queries from TRL completion format
-        queries = []
-        for completion in completions:
-            try:
-                if isinstance(completion, list) and len(completion) > 0:
-                    content = completion[0].get("content", "")
-                elif isinstance(completion, dict):
-                    content = completion.get("content", "")
-                else:
-                    content = str(completion)
-                queries.append(content)
-            except Exception as e:
-                print(f"Warning: Error extracting completion: {e}")
-                queries.append("")  # Default empty query
+        # Get relevant documents for each completion
+        # Map each prompt to its relevant documents
+        relevant_docs_list = []
         
-        # For GRPO, we don't have relevant_doc_ids per completion
-        # Use empty lists - the reward model will compute Boolean query rewards
-        dummy_relevant = [[] for _ in queries]
+        for prompt in prompts:
+            # Get relevant docs for this prompt
+            relevant_docs = prompt_to_relevant_docs.get(prompt, [])
+            relevant_docs_list.append(relevant_docs)
+        
+        # Debug: Check lengths match
+        print(f"🔍 GRPO Debug - prompts: {len(prompts)}, completions: {len(completions)}, relevant_docs_list: {len(relevant_docs_list)}")
+        if len(prompts) != len(completions) or len(completions) != len(relevant_docs_list):
+            print(f"⚠️ Length mismatch! prompts={len(prompts)}, completions={len(completions)}, relevant_docs={len(relevant_docs_list)}")
+        else:
+            print(f"✅ Lengths match - all arrays have {len(completions)} items")
         
         try:
-            # Use existing batch reward computation
-            rewards = reward_model.compute_rewards_batch(queries, dummy_relevant)
+            # Use existing batch reward computation with relevant documents
+            # completions are the generated queries to evaluate
+            # relevant_docs_list contains the ground truth relevant docs for each prompt
+            rewards = reward_model.compute_rewards_batch(completions, relevant_docs_list)
+            print(f"🔍 GRPO Debug - computed {len(rewards)} rewards, first few: {rewards[:3]}")
             return [float(r) for r in rewards]
         except Exception as e:
-            print(f"Warning: Error computing batch rewards: {e}")
-            return [0.0] * len(queries)
+            print(f"❌ Error computing batch rewards: {e}")
+            print(f"Debug info - prompts len: {len(prompts)}, completions len: {len(completions)}, relevant_docs len: {len(relevant_docs_list)}")
+            return [0.0] * len(completions)
     
-    # Quick smoke test
-    test_completions = [[{"content": "stem cell AND pulmonary hypertension"}]]
-    test_rewards = grpo_reward_function(test_completions)
-    print(f"✅ Reward model ready - test reward: {test_rewards[0]:.3f}")
     
     return grpo_reward_function
 
 
-def prepare_dataset_for_grpo() -> Dataset:
+def prepare_dataset_for_grpo() -> tuple[Dataset, Dict[str, List[str]]]:
     """
     Prepare dataset for GRPO training using existing data loading.
+    
+    Returns:
+        Dataset: GRPO-formatted dataset
+        Dict: Mapping from prompts to their relevant document IDs
     """
     print("📊 Loading dataset for GRPO training...")
     
@@ -140,21 +142,29 @@ def prepare_dataset_for_grpo() -> Dataset:
         max_samples=1000  # Use 1000 samples for meaningful training
     )
     
+    # Create mapping from prompts to relevant documents
+    prompt_to_relevant_docs = {}
+    
     # Convert to format expected by GRPO
     # GRPO needs prompts as text, will generate completions automatically
     grpo_data = []
     for item in raw_dataset:
+        prompt = item["query"]
+        relevant_docs = item["relevant_doc_ids"]
+        
         grpo_data.append({
-            "prompt": item["query"],  # The prompt for completion generation
-            # Keep relevant_doc_ids for reference if needed later
-            "relevant_doc_ids": item["relevant_doc_ids"]
+            "prompt": prompt,  # The prompt for completion generation
         })
+        
+        # Store mapping for reward computation
+        prompt_to_relevant_docs[prompt] = relevant_docs
     
     # Convert to HuggingFace Dataset
     dataset = Dataset.from_list(grpo_data)
     print(f"✅ Dataset prepared for GRPO: {len(dataset)} prompts")
+    print(f"✅ Created prompt-to-relevant-docs mapping with {len(prompt_to_relevant_docs)} entries")
     
-    return dataset
+    return dataset, prompt_to_relevant_docs
 
 
 def run_grpo_training() -> bool:
@@ -191,8 +201,8 @@ def run_grpo_training() -> bool:
         
         # Setup components
         config = setup_grpo_config()
-        reward_function = setup_reward_function()
-        dataset = prepare_dataset_for_grpo()
+        dataset, prompt_to_relevant_docs = prepare_dataset_for_grpo()
+        reward_function = setup_reward_function(prompt_to_relevant_docs)
         
         print("🔧 Initializing GRPO trainer...")
         
