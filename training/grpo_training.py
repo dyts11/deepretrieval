@@ -139,7 +139,7 @@ def prepare_dataset_for_grpo() -> tuple[Dataset, Dict[str, List[str]]]:
     # Use existing data loading function
     raw_dataset = load_deepretrieval_dataset(
         data_path="data/full_train.jsonl",
-        max_samples=100  # Use 1000 samples for meaningful training
+        max_samples=4000  # Use 1000 samples for meaningful training
     )
     
     # Create mapping from prompts to relevant documents
