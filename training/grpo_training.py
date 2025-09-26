@@ -34,7 +34,7 @@ def setup_grpo_config() -> GRPOConfig:
     
     config = GRPOConfig(
         # Core training parameters (using correct GRPO parameter names)
-        learning_rate=1e-6,                       # Proven stable learning rate
+        learning_rate=5e-6,                       # Proven stable learning rate
         #per_device_train_batch_size=4,            # Per-device batch size
         #gradient_accumulation_steps=4,            # Compensate for smaller batch size
         per_device_train_batch_size=4,            # Reduced for memory constraints
