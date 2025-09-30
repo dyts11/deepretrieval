@@ -129,11 +129,11 @@ def setup_reward_model():
     print("✅ Reward model ready")
     return reward_model
 
-def prepare_dataset_for_training(max_samples: int = 1000) -> Dataset:
+def prepare_dataset_for_training(max_samples: int = 4000) -> Dataset:
     """Prepare dataset for training with shuffle and default 1000 samples."""
     print("📊 Loading dataset for training...")
     dataset = load_deepretrieval_dataset(
-        data_path="data/train.jsonl", 
+        data_path="data/full_train.jsonl", 
         max_samples=max_samples,
     )
     print(f"✅ Dataset loaded: {len(dataset)} examples")
@@ -350,12 +350,12 @@ def run_full_training() -> bool:
                 torch.cuda.empty_cache()
 
         # Save final model and tokenizer
-        #print("\n💾 Saving final model...")
-        #save_dir = "models/phase5_final_recall"
-        #os.makedirs(save_dir, exist_ok=True)
-        #ppo_trainer.model.save_pretrained(save_dir)
-        #tokenizer.save_pretrained(save_dir)
-        #print(f"✅ Final model saved: {save_dir}")
+        print("\n💾 Saving final model...")
+        save_dir = "trained_models/llama_recall"
+        os.makedirs(save_dir, exist_ok=True)
+        ppo_trainer.model.save_pretrained(save_dir)
+        tokenizer.save_pretrained(save_dir)
+        print(f"✅ Final model saved: {save_dir}")
         
         wandb.finish()
         print("\n🎉 Phase 5 completed successfully!")
