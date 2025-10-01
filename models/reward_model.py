@@ -5,11 +5,136 @@ Handles reward computation for generated queries using PubMed API
 
 import torch
 import torch.nn as nn
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from utils.pubmed_api import PubmedAPI, create_pubmed_retriever
 import asyncio
 import math
 import re
+
+
+def parse_boolean_query(query: str) -> List[str]:
+    """
+    Parse a Boolean query into individual search terms for retrieval.
+    
+    For a query like: ((Total Knee Arthroplasty Trial OR Total Knee Arthroplasty Surgery) AND (Drainage OR Antiotics Trial))
+    
+    This function will:
+    1. Parse the Boolean structure
+    2. Generate individual search terms based on AND/OR logic
+    3. Return a list of search queries to execute
+    
+    Args:
+        query: Boolean query string
+        
+    Returns:
+        List of individual search queries to execute
+    """
+    if not query or not query.strip():
+        return [query]
+    
+    # Clean and normalize the query
+    query = query.strip()
+    
+    # Simple heuristic: if no Boolean operators, return as-is
+    if not any(op in query.upper() for op in [' AND ', ' OR ', ' NOT ']):
+        return [query]
+    
+    try:
+        # Handle nested parentheses by expanding combinations
+        # For complex queries, we'll use a simplified approach:
+        # 1. Split on main AND operators
+        # 2. For each AND clause, handle OR combinations
+        # 3. Generate Cartesian product of combinations
+        
+        # Remove outer parentheses if they wrap the entire query
+        query = query.strip()
+        if query.startswith('(') and query.endswith(')'):
+            # Check if these are the outermost parentheses
+            paren_count = 0
+            for i, char in enumerate(query):
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                    if paren_count == 0 and i < len(query) - 1:
+                        # Not outermost parentheses
+                        break
+            else:
+                # These are outermost parentheses, remove them
+                query = query[1:-1].strip()
+        
+        # Split on AND (case insensitive, but preserve original case in terms)
+        and_parts = re.split(r'\s+AND\s+', query, flags=re.IGNORECASE)
+        
+        if len(and_parts) == 1:
+            # No AND operators, might have OR operators
+            or_parts = re.split(r'\s+OR\s+', query, flags=re.IGNORECASE)
+            # Clean each part
+            cleaned_parts = []
+            for part in or_parts:
+                cleaned = part.strip().strip('()')
+                if cleaned:
+                    cleaned_parts.append(cleaned)
+            return cleaned_parts if cleaned_parts else [query]
+        
+        # Handle AND combinations
+        # For each AND part, extract OR alternatives
+        and_groups = []
+        for and_part in and_parts:
+            and_part = and_part.strip().strip('()')
+            if ' OR ' in and_part.upper():
+                # Split on OR
+                or_alternatives = re.split(r'\s+OR\s+', and_part, flags=re.IGNORECASE)
+                cleaned_alternatives = []
+                for alt in or_alternatives:
+                    cleaned = alt.strip().strip('()')
+                    if cleaned:
+                        cleaned_alternatives.append(cleaned)
+                and_groups.append(cleaned_alternatives if cleaned_alternatives else [and_part])
+            else:
+                # Single term
+                cleaned = and_part.strip()
+                if cleaned:
+                    and_groups.append([cleaned])
+        
+        if not and_groups:
+            return [query]
+        
+        # Generate Cartesian product of AND groups
+        import itertools
+        combinations = list(itertools.product(*and_groups))
+        
+        # Create search queries from combinations
+        search_queries = []
+        for combo in combinations:
+            # Join terms with AND for this combination
+            combined_query = ' AND '.join(f'({term})' if ' ' in term else term for term in combo)
+            search_queries.append(combined_query)
+        
+        # Also add individual terms for broader coverage
+        all_terms = []
+        for group in and_groups:
+            all_terms.extend(group)
+        
+        # Add individual high-value terms
+        for term in all_terms:
+            if len(term.split()) >= 2:  # Multi-word terms are more specific
+                search_queries.append(term)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_queries = []
+        for q in search_queries:
+            if q not in seen:
+                seen.add(q)
+                unique_queries.append(q)
+        
+        return unique_queries if unique_queries else [query]
+        
+    except Exception as e:
+        # If parsing fails, fall back to original query
+        print(f"Boolean query parsing failed for '{query}': {e}")
+        return [query]
 
 
 def compute_ndcg_at_k(retrieved: List[str], relevant: List[str], k: int) -> float:
@@ -43,7 +168,7 @@ class RetrievalRewardModel(nn.Module):
     def __init__(
         self,
         pubmed_api: PubmedAPI,
-        top_k: int = 50,
+        top_k: int = 100,
         reward_scale: float = 5.0,
         min_reward: float = 0.0,
         max_reward: float = 5.0,
@@ -87,32 +212,35 @@ class RetrievalRewardModel(nn.Module):
         relevant_pmids: List[str]
     ) -> float:
         try:
-            # 1) Retrieve with the full query first
-            retrieved_pmids = self.pubmed_api.search_with_keywords(query, topk=self.top_k)
-
-            # 2) If full-query gets zero docs, try safer fallback using 2+ clause combinations
-            #    We prefer OR-combinations of two clauses; if none reach a small threshold, fall back to best single clause.
-            #if len(retrieved_pmids) == 0:
-            #    import re as _re
-            #    first_line = query.splitlines()[0].strip()
-            #    parts = [_p.strip() for _p in _re.split(r"\bAND\b|\bOR\b", first_line, flags=_re.IGNORECASE) if _p.strip()]
-            #    best_pmids = []
-            #    # try all 2-clause OR combinations first
-            #    for i in range(len(parts)):
-            #        for j in range(i + 1, len(parts)):
-            #            comb_query = f"{parts[i]} OR {parts[j]}"
-            #            pmids_comb = self.pubmed_api.search_with_keywords(comb_query, topk=self.top_k)
-            #            if len(pmids_comb) > len(best_pmids):
-            #                best_pmids = pmids_comb
-            #    retrieved_pmids = best_pmids
-            #    # if still weak, try single parts and keep the best
-            #    if len(retrieved_pmids)== 0:
-            #        for part in parts:
-            #            pmids_part = self.pubmed_api.search_with_keywords(part, topk=self.top_k)
-            #            if len(pmids_part) > len(best_pmids):
-            #                best_pmids = pmids_part
-            #        if best_pmids:
-            #            retrieved_pmids = best_pmids
+            # 1) Parse Boolean query into multiple search queries
+            search_queries = parse_boolean_query(query)
+            
+            # 2) Execute searches and combine results
+            all_retrieved_pmids = []
+            pmid_scores = {}  # Track how many queries retrieved each PMID
+            
+            for search_query in search_queries:
+                try:
+                    pmids = self.pubmed_api.search_with_keywords(search_query, topk=self.top_k)
+                    for pmid in pmids:
+                        if pmid not in pmid_scores:
+                            pmid_scores[pmid] = 0
+                            all_retrieved_pmids.append(pmid)
+                        pmid_scores[pmid] += 1
+                except Exception as e:
+                    print(f"Search failed for query '{search_query}': {e}")
+                    continue
+            
+            # 3) Sort by relevance score (number of queries that retrieved this PMID)
+            # PMIDs retrieved by more queries are likely more relevant
+            all_retrieved_pmids.sort(key=lambda pmid: pmid_scores[pmid], reverse=True)
+            
+            # 4) Take top-k results
+            retrieved_pmids = all_retrieved_pmids[:self.top_k]
+            
+            # 5) Fallback: if no results from Boolean parsing, try original query
+            if not retrieved_pmids:
+                retrieved_pmids = self.pubmed_api.search_with_keywords(query, topk=self.top_k)
             
             relevant_set = set(relevant_pmids)
             topk_list = retrieved_pmids[: self.top_k]
