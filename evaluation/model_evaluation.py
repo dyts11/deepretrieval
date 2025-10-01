@@ -221,6 +221,7 @@ class TrainedModelEvaluator:
                 else:
                     recall = self.calculate_recall_at_k(query, test_item['relevant_pmids'], k)
                     recall_results[f'recall@{k}'].append(recall)
+                    print(f"recall: {recall}")
                 
                 if (i + 1) % 10 == 0:
                     print(f"     Processed {i + 1}/{len(self.test_data)} samples")
