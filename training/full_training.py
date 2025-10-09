@@ -54,8 +54,8 @@ def setup_ppo_config(device: str) -> PPOConfig:
 
 def load_model_and_tokenizer():
     """Load policy (with value head), reference model, and tokenizer."""
-    print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
-    #print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
+    #print("🤖 Loading Qwen2-0.5B-Instruct policy and reference models...")
+    print("🤖 Loading LLaMA-3.2-3B-Instruct policy and reference models...")
     #print("🤖 Loading Qwen/Qwen2.5-3B-Instruct policy and reference models...")
     # Silence the repetitive gradient-checkpointing vs caching warnings from transformers
     hf_logging.set_verbosity_error()
@@ -70,8 +70,8 @@ def load_model_and_tokenizer():
     # Use bfloat16 for larger models to save memory while maintaining stability
     dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 
-    model_name = "Qwen/Qwen2-0.5B-Instruct"
-    #model_name = "meta-llama/Llama-3.2-3B-Instruct"
+    #model_name = "Qwen/Qwen2-0.5B-Instruct"
+    model_name = "meta-llama/Llama-3.2-3B-Instruct"
     #model_name = "Qwen/Qwen2.5-3B-Instruct"
 
     # Policy with value head
@@ -161,10 +161,10 @@ def run_full_training() -> bool:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(42)
 
-    wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
-            "model": "Qwen/Qwen2-0.5B-Instruct",
-    #wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
-    #        "model": "meta-llama/Llama-3.2-3B-Instruct",
+    #wandb.init(project="deepretrieval-ppo", name="phase5-full-training", config={
+    #        "model": "Qwen/Qwen2-0.5B-Instruct",
+    wandb.init(project="deepretrieval-ppo", name="llama3.2-3b-experiment", config={
+            "model": "meta-llama/Llama-3.2-3B-Instruct",
     #wandb.init(project="deepretrieval-ppo", name="qwen2.5-3b-experiment", config={
     #        "model": "Qwen/Qwen2.5-3B-Instruct",
         "dataset_samples": 1000,
@@ -351,7 +351,7 @@ def run_full_training() -> bool:
 
         # Save final model and tokenizer
         print("\n💾 Saving final model...")
-        save_dir = "trained_models/qwen_recall"
+        save_dir = "trained_models/llama_recall_100"
         os.makedirs(save_dir, exist_ok=True)
         ppo_trainer.model.save_pretrained(save_dir)
         tokenizer.save_pretrained(save_dir)

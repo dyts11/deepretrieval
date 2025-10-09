@@ -159,7 +159,7 @@ The persistent negative KL (-3 to 0) suggests:
 - **Not immediately dangerous**: Unlike experiment 1, these are manageable magnitudes
 
 #### Conclusion:
-Experiment 2 successfully solved the stability issues but at the cost of learning effectiveness. The 10x learning rate reduction created a **stable but under-performing training regime**. 
+Experiment 2 successfully solved the stability issues but at the cost of learning effectiveness. The 10x learning rate reduction created aC **stable but under-performing training regime**. 
 
 **Key Finding**: Need to find the optimal learning rate between 1e-6 (too conservative) and 1e-5 (too aggressive).
 
