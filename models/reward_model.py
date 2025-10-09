@@ -214,6 +214,7 @@ class RetrievalRewardModel(nn.Module):
         try:
             # 1) Parse Boolean query into multiple search queries
             search_queries = parse_boolean_query(query)
+            print("computing reward...")
             
             # 2) Execute searches and combine results
             all_retrieved_pmids = []
@@ -230,6 +231,7 @@ class RetrievalRewardModel(nn.Module):
                 except Exception as e:
                     print(f"Search failed for query '{search_query}': {e}")
                     continue
+            print("searched for all queries...")
             
             # 3) Sort by relevance score (number of queries that retrieved this PMID)
             # PMIDs retrieved by more queries are likely more relevant
@@ -237,7 +239,7 @@ class RetrievalRewardModel(nn.Module):
             
             # 4) Take top-k results
             retrieved_pmids = all_retrieved_pmids[:self.top_k]
-            
+            print("sorted and took top-k results...")
             # 5) Fallback: if no results from Boolean parsing, try original query
             if not retrieved_pmids:
                 retrieved_pmids = self.pubmed_api.search_with_keywords(query, topk=self.top_k)
