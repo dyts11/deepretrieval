@@ -120,7 +120,7 @@ def setup_reward_model():
     """Setup reward model for training."""
     print("🎯 Setting up reward model...")
     
-    reward_model = create_reward_model(top_k=100, reward_scale=1.0)
+    reward_model = create_reward_model(top_k=50, reward_scale=1.0)
     
     # Quick smoke test
     test_query = "stem cell therapy pulmonary arterial hypertension"
